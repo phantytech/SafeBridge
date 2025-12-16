@@ -1,0 +1,115 @@
+You are a Senior Frontend Engineer and Computer Vision Engineer.
+Your task is to build a HACKATHON-READY, WORKING prototype named:
+
+SAFE BRIDGE
+Real-time Sign Language Communication & Emergency Safety System
+
+This project must be SIMPLE, STABLE, and DEMO-READY.
+Do NOT overengineer. Judges care about FUNCTION + IMPACT.
+
+--------------------------------------------------
+TECH STACK (DO NOT CHANGE)
+--------------------------------------------------
+• React + TypeScript
+• Vite
+• Tailwind CSS
+• react-webcam
+• @mediapipe/tasks-vision
+• lucide-react
+
+--------------------------------------------------
+GOAL
+--------------------------------------------------
+Help deaf/mute people communicate AND trigger emergency alerts
+using real-time hand gesture detection.
+
+--------------------------------------------------
+APP STRUCTURE (KEEP IT MINIMAL)
+--------------------------------------------------
+/src
+ ├─ components/
+ │   ├─ SignDetector.tsx
+ │   ├─ TextToSign.tsx
+ │   ├─ EmergencyOverlay.tsx
+ ├─ context/
+ │   └─ EmergencyContext.tsx
+ ├─ utils/
+ │   └─ gestureLogic.ts
+ ├─ App.tsx
+ └─ main.tsx
+
+--------------------------------------------------
+FEATURE 1 — SIGN DETECTOR (MAIN DEMO)
+--------------------------------------------------
+In SignDetector.tsx:
+
+• Show webcam using react-webcam
+• Load MediaPipe HandLandmarker safely (async)
+• Detect 1 hand only (simplify)
+• Draw landmark dots + lines on canvas
+• Show status text below video
+
+--------------------------------------------------
+GESTURE LOGIC (VERY IMPORTANT)
+--------------------------------------------------
+Use BASIC geometric rules only.
+
+If:
+• All fingers extended → "HELLO"
+• Thumb up, others folded → "YES"
+• All fingers folded (fist) → "SOS"
+• Index + middle finger up → "PEACE"
+
+Logic can be approximate — STABLE output > accuracy.
+
+--------------------------------------------------
+FEATURE 2 — EMERGENCY MODE (WINNER POINT)
+--------------------------------------------------
+If "SOS" is detected continuously for ~2–3 seconds:
+
+• Trigger EmergencyOverlay
+• Full screen RED background
+• Text:
+  🚨 EMERGENCY DETECTED
+  Sending location to authorities...
+
+Add a MANUAL "PANIC BUTTON" too.
+
+No real GPS needed — SIMULATION is OK.
+
+--------------------------------------------------
+FEATURE 3 — TEXT TO SIGN (SECONDARY)
+--------------------------------------------------
+Simple chat UI.
+
+If user types:
+• "hello"
+• "help"
+
+Show a placeholder animated box
+(label it: "Sign Animation")
+
+--------------------------------------------------
+UI REQUIREMENTS
+--------------------------------------------------
+• Dark background
+• Neon green text
+• Big readable text
+• Looks like science prototype
+• Judges must understand in 10 seconds
+
+--------------------------------------------------
+IMPORTANT RULES
+--------------------------------------------------
+• MUST RUN without errors
+• TypeScript types required
+• No backend
+• No fake libraries
+• Keep code readable
+• THIS IS A DEMO PROJECT, NOT PRODUCTION
+
+--------------------------------------------------
+FINAL OUTPUT
+--------------------------------------------------
+Generate ALL REQUIRED FILES with WORKING code.
+Focus on DEMO STABILITY over perfection.
