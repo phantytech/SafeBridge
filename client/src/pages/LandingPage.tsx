@@ -9,9 +9,7 @@ const LandingPage: React.FC = () => {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 h-20 px-6 md:px-12 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
-            <HeartHandshake size={24} />
-          </div>
+          <img src="/logo.png" alt="SafeBridge Logo" className="w-12 h-12 object-contain" />
           <div>
             <h1 className="font-display font-bold text-xl text-slate-800 leading-tight">SafeBridge</h1>
             <p className="text-xs text-slate-500 font-medium">Bangladesh</p>
@@ -19,7 +17,7 @@ const LandingPage: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-4">
-          <Link href="/app">
+          <Link href="/auth">
             <button className="bg-primary hover:bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 text-sm">
               Launch App
               <ArrowRight size={16} />
@@ -50,7 +48,7 @@ const LandingPage: React.FC = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/app">
+              <Link href="/auth">
                 <button className="bg-primary hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-xl shadow-blue-500/20 transition-all hover:-translate-y-1 w-full sm:w-auto text-center">
                   Start Translating
                 </button>
@@ -178,12 +176,10 @@ const LandingPage: React.FC = () => {
       <footer className="bg-slate-900 text-slate-400 py-12 px-6 md:px-12">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-white">
-                <HeartHandshake size={18} />
-             </div>
+             <img src="/logo.png" alt="SafeBridge Logo" className="w-10 h-10 object-contain" />
              <span className="font-bold text-white">SafeBridge BD</span>
           </div>
-          <p className="text-sm">© 2024 SafeBridge. Built for a Safer Bangladesh.</p>
+          <p className="text-sm">© 2025 SafeBridge. Built for a Safer Bangladesh. 2025inc</p>
         </div>
       </footer>
     </div>
