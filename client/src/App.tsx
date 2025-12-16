@@ -1,9 +1,11 @@
 import React from 'react';
+import { Switch, Route } from "wouter";
 import SignDetector from './components/SignDetector';
 import TextToSign from './components/TextToSign';
 import EmergencyOverlay from './components/EmergencyOverlay';
 import { EmergencyProvider, useEmergency } from './context/EmergencyContext';
 import { HeartHandshake, Bell, Menu, User } from 'lucide-react';
+import LandingPage from './pages/LandingPage';
 
 const Header = () => (
   <header className="fixed top-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-md z-40 px-6 md:px-12 flex items-center justify-between border-b border-slate-100">
@@ -13,7 +15,7 @@ const Header = () => (
       </div>
       <div>
         <h1 className="font-display font-bold text-xl text-slate-800 leading-tight">SafeBridge</h1>
-        <p className="text-xs text-slate-500 font-medium">Accessible Communication</p>
+        <p className="text-xs text-slate-500 font-medium">Bangladesh</p>
       </div>
     </div>
     
@@ -46,7 +48,7 @@ const PanicButton = () => {
       className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-4 px-6 rounded-2xl border border-red-100 transition-all hover:scale-[1.02] active:scale-95 w-full flex items-center justify-center gap-2 group"
     >
       <span className="w-2 h-2 rounded-full bg-red-500 group-hover:animate-ping"></span>
-      Emergency SOS
+      Emergency SOS (999)
     </button>
   );
 }
@@ -55,6 +57,7 @@ const Dashboard = () => {
   return (
     <div className="pt-28 pb-12 px-6 md:px-12 max-w-[1600px] mx-auto min-h-screen">
       <EmergencyOverlay />
+      <Header />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
         {/* Main Content - 8 Cols */}
@@ -114,8 +117,10 @@ function App() {
   return (
     <EmergencyProvider>
       <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-        <Header />
-        <Dashboard />
+        <Switch>
+          <Route path="/" component={LandingPage} />
+          <Route path="/app" component={Dashboard} />
+        </Switch>
       </div>
     </EmergencyProvider>
   );

@@ -46,8 +46,8 @@ const EmergencyOverlay: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-800">Sharing Location</h4>
-                  <p className="text-sm text-slate-500">37.7749° N, 122.4194° W</p>
-                  <p className="text-xs text-slate-400 mt-1">San Francisco, CA</p>
+                  <p className="text-sm text-slate-500">23.8103° N, 90.4125° E</p>
+                  <p className="text-xs text-slate-400 mt-1">Dhaka, Bangladesh</p>
                 </div>
               </div>
 
@@ -57,7 +57,7 @@ const EmergencyOverlay: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-800">Contacting Services</h4>
-                  <p className="text-sm text-slate-500">Connecting to 911...</p>
+                  <p className="text-sm text-slate-500">Connecting to 999 (National Emergency Service)...</p>
                   <div className="h-1.5 w-full bg-slate-200 rounded-full mt-2 overflow-hidden">
                     <motion.div 
                       initial={{ width: "0%" }}
