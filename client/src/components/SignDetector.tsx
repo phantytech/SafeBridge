@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { FilesetResolver, HandLandmarker, DrawingUtils, NormalizedLandmark } from '@mediapipe/tasks-vision';
-import { Camera, RefreshCw, Video, VideoOff } from 'lucide-react';
+import { Camera, RefreshCw, Video, VideoOff, BookOpen } from 'lucide-react';
 import { detectGesture, DetectedGesture } from '../utils/gestureLogic';
 import { useEmergency } from '../context/EmergencyContext';
 import { motion } from 'framer-motion';
+import { Link } from 'wouter';
 
 const SignDetector: React.FC = () => {
   const webcamRef = useRef<Webcam>(null);
@@ -138,13 +139,24 @@ const SignDetector: React.FC = () => {
               <h3 className="text-xl font-display font-bold text-slate-800">Camera is Off</h3>
               <p className="text-slate-500 mt-2 max-w-xs mx-auto">Enable the camera to start translating sign language in real-time.</p>
             </div>
-            <button 
-              onClick={toggleWebcam}
-              className="bg-primary hover:bg-blue-600 text-white px-8 py-3 rounded-full font-medium shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 mx-auto"
-            >
-              <Video size={20} />
-              Start Camera
-            </button>
+            <div className="flex flex-col items-center gap-3">
+              <button 
+                onClick={toggleWebcam}
+                className="bg-primary hover:bg-blue-600 text-white px-8 py-3 rounded-full font-medium shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                data-testid="button-start-camera"
+              >
+                <Video size={20} />
+                Start Camera
+              </button>
+              <Link 
+                href="/sign-language-guide" 
+                className="text-slate-500 hover:text-primary text-sm font-medium flex items-center gap-1.5 transition-colors"
+                data-testid="link-sign-guide"
+              >
+                <BookOpen size={16} />
+                View Sign Language Guide
+              </Link>
+            </div>
           </div>
         )}
 
@@ -174,7 +186,7 @@ const SignDetector: React.FC = () => {
 
       {/* Live Translation Bar */}
       <div className="h-28 bg-white border-t border-slate-100 p-6 flex items-center justify-between">
-        <div className="w-full">
+        <div className="flex-1">
            <p className="text-slate-400 text-xs font-bold tracking-wider uppercase mb-1">Detected Gesture</p>
            <div className="flex items-center justify-between">
              <div className="h-12 flex items-center">
@@ -200,6 +212,14 @@ const SignDetector: React.FC = () => {
              )}
            </div>
         </div>
+        <Link 
+          href="/sign-language-guide" 
+          className="flex items-center gap-2 text-slate-500 hover:text-primary bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full text-sm font-medium transition-colors ml-4"
+          data-testid="link-sign-guide-bar"
+        >
+          <BookOpen size={16} />
+          <span className="hidden sm:inline">Sign Guide</span>
+        </Link>
       </div>
     </div>
   );
