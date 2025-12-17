@@ -1,6 +1,7 @@
 import React from 'react';
 import { Switch, Route } from "wouter";
 import LandingPage from './pages/LandingPage';
+import LearnMore from './pages/LearnMore';
 import AuthPage from './pages/AuthPage';
 import MainApp from './pages/MainApp';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -22,6 +23,7 @@ function App() {
       <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900">
         <Switch>
           <Route path="/" component={LandingPage} />
+          <Route path="/learn-more" component={LearnMore} />
           <Route path="/auth" component={AuthPage} />
           
           {/* Protected Routes */}

@@ -53,9 +53,11 @@ const LandingPage: React.FC = () => {
                   Start Translating
                 </button>
               </Link>
-              <button className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-8 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1 w-full sm:w-auto text-center">
-                Learn More
-              </button>
+              <Link href="/learn-more">
+                <button data-testid="button-learn-more" className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-8 py-4 rounded-xl font-bold text-lg transition-all hover:-translate-y-1 w-full sm:w-auto text-center">
+                  Learn More
+                </button>
+              </Link>
             </div>
           </motion.div>
           
