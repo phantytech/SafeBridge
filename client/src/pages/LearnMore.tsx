@@ -81,7 +81,7 @@ const LearnMore = () => {
             </h2>
             <div className="space-y-4 text-slate-600 text-lg leading-relaxed">
               <p>
-                In Bangladesh, over 1.5 million people live with hearing disabilities. While sign language serves as their primary mode of communication, most of the population doesn't understand it—creating a significant barrier in everyday interactions.
+                In Bangladesh, 3.84 million persons with disabilities are registered under 12 official categories, according to the Department of Social Services. For those with hearing disabilities, sign language serves as their primary mode of communication, but most of the population doesn't understand it—creating a significant barrier in everyday interactions.
               </p>
               <p>
                 This communication gap becomes even more critical during emergencies. When someone needs to call 999 for help but cannot speak or hear, precious seconds can mean the difference between safety and danger.
@@ -288,8 +288,8 @@ const LearnMore = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-                <div className="text-4xl font-bold text-primary mb-2">1.5M+</div>
-                <div className="text-slate-400">People with hearing disabilities in Bangladesh</div>
+                <div className="text-4xl font-bold text-primary mb-2">3.84M</div>
+                <div className="text-slate-400">Registered persons with disabilities in Bangladesh</div>
               </div>
               <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
                 <div className="text-4xl font-bold text-primary mb-2">98%</div>
