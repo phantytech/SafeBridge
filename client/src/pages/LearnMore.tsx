@@ -64,10 +64,10 @@ const LearnMore = () => {
             <span>Revolutionizing Communication in Bangladesh</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-display font-bold text-slate-900 leading-tight mb-6">
-            Breaking Barriers with <span className="text-primary">AI-Powered</span> Sign Language Translation
+            Breaking Barriers for <span className="text-primary">All Persons</span> with Disabilities
           </h1>
           <p className="text-xl text-slate-500 leading-relaxed">
-            SafeBridge is more than just a translation tool—it's a comprehensive safety and communication platform designed to empower the deaf and hard-of-hearing community in Bangladesh.
+            SafeBridge is a comprehensive accessibility and safety platform designed to empower all persons with disabilities in Bangladesh—with a primary focus on speech and hearing impaired individuals through AI-powered sign language translation.
           </p>
         </motion.div>
       </div>
@@ -81,13 +81,16 @@ const LearnMore = () => {
             </h2>
             <div className="space-y-4 text-slate-600 text-lg leading-relaxed">
               <p>
-                In Bangladesh, 3.84 million persons with disabilities are registered under 12 official categories, according to the Department of Social Services. For those with hearing disabilities, sign language serves as their primary mode of communication, but most of the population doesn't understand it—creating a significant barrier in everyday interactions.
+                In Bangladesh, 3.84 million persons with disabilities are registered under 12 official categories, according to the Department of Social Services. Among them, 3.45 million receive government allowances, highlighting the scale of support needed.
               </p>
               <p>
-                This communication gap becomes even more critical during emergencies. When someone needs to call 999 for help but cannot speak or hear, precious seconds can mean the difference between safety and danger.
+                For those with speech and hearing disabilities—our primary focus—sign language serves as their main mode of communication, but most of the population doesn't understand it. This creates significant barriers in everyday interactions, from visiting a hospital to shopping at a store.
+              </p>
+              <p>
+                These communication gaps become even more critical during emergencies. When someone needs to call 999 for help but cannot speak or hear, precious seconds can mean the difference between safety and danger.
               </p>
               <p className="font-semibold text-slate-800">
-                SafeBridge was built to eliminate these barriers and ensure everyone has equal access to communication and emergency services.
+                SafeBridge was built to eliminate these barriers and ensure all persons with disabilities have equal access to communication, safety, and opportunity.
               </p>
             </div>
           </motion.div>
@@ -199,8 +202,8 @@ const LearnMore = () => {
               {
                 icon: HeartHandshake,
                 title: "Community Driven",
-                description: "Built in collaboration with the deaf community in Bangladesh to ensure cultural relevance and accuracy.",
-                features: ["Local sign language", "Community tested", "Regular updates"]
+                description: "Built in collaboration with disability communities across Bangladesh to ensure cultural relevance and accessibility for all.",
+                features: ["Local sign language", "Community tested", "Inclusive design"]
               }
             ].map((feature, index) => (
               <motion.div
@@ -283,7 +286,7 @@ const LearnMore = () => {
               Making a Real Difference
             </h2>
             <p className="text-slate-300 text-lg leading-relaxed mb-12">
-              SafeBridge isn't just about technology—it's about creating equal opportunities, fostering independence, and potentially saving lives. Every conversation enabled, every emergency responded to, represents a step toward a more inclusive Bangladesh.
+              SafeBridge isn't just about technology—it's about creating equal opportunities, fostering independence, and potentially saving lives for all persons with disabilities. Every conversation enabled, every emergency responded to, represents a step toward a more inclusive Bangladesh where no one is left behind.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">

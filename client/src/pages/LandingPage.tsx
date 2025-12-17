@@ -44,7 +44,7 @@ const LandingPage: React.FC = () => {
             </h1>
             
             <p className="text-xl text-slate-500 mb-8 max-w-lg leading-relaxed">
-              Real-time sign language translation and emergency safety system powered by advanced AI. Designed for accessibility and peace of mind.
+              An accessibility platform for all persons with disabilities in Bangladesh—featuring real-time sign language translation and emergency safety system for the speech and hearing impaired.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -137,7 +137,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-display font-bold text-slate-900 mb-4">Why SafeBridge?</h2>
-            <p className="text-slate-500 text-lg">Built with cutting-edge technology to ensure safety and seamless communication for everyone.</p>
+            <p className="text-slate-500 text-lg">Built with cutting-edge technology to ensure safety and accessibility for Bangladesh's 3.84 million persons with disabilities.</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
