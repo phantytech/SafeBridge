@@ -12,7 +12,11 @@ import {
   ExternalLink
 } from 'lucide-react';
 
-const EmergencyProfileCard = () => {
+interface EmergencyProfileCardProps {
+  onNavigateToSettings?: () => void;
+}
+
+const EmergencyProfileCard = ({ onNavigateToSettings }: EmergencyProfileCardProps) => {
   const { settings } = useAccessibility();
   const profile = settings.emergencyProfile;
 
@@ -31,13 +35,14 @@ const EmergencyProfileCard = () => {
         <p className="text-slate-500 text-sm mb-4">
           Set up your emergency profile so first responders can quickly access your medical information during emergencies.
         </p>
-        <a 
-          href="#settings" 
+        <button 
+          data-testid="button-configure-profile"
+          onClick={onNavigateToSettings}
           className="inline-flex items-center gap-2 text-primary font-medium text-sm hover:text-blue-600"
         >
           Configure in Settings
           <ExternalLink size={14} />
-        </a>
+        </button>
       </div>
     );
   }

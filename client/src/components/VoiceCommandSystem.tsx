@@ -2,6 +2,54 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { Mic, MicOff, Volume2, AlertCircle } from 'lucide-react';
 
+// Web Speech API types
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
+
 interface VoiceCommandSystemProps {
   onNavigate: (tab: string) => void;
   onEmergency: () => void;
@@ -12,7 +60,7 @@ const VoiceCommandSystem = ({ onNavigate, onEmergency }: VoiceCommandSystemProps
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [recognition, setRecognition] = useState<ISpeechRecognition | null>(null);
   const [isSupported, setIsSupported] = useState(true);
 
   const showFeedback = useCallback((message: string) => {
@@ -43,7 +91,19 @@ const VoiceCommandSystem = ({ onNavigate, onEmergency }: VoiceCommandSystemProps
       return;
     }
     
-    if (lowerCommand.includes('settings') || lowerCommand.includes('accessibility')) {
+    if (lowerCommand.includes('accessibility') || lowerCommand.includes('accessible')) {
+      onNavigate('accessibility');
+      showFeedback('Opening Accessibility Settings');
+      return;
+    }
+    
+    if (lowerCommand.includes('caregiver') || lowerCommand.includes('helper') || lowerCommand.includes('assistant')) {
+      onNavigate('caregiver');
+      showFeedback('Opening Caregiver Mode');
+      return;
+    }
+    
+    if (lowerCommand.includes('settings') || lowerCommand.includes('options') || lowerCommand.includes('preferences')) {
       onNavigate('settings');
       showFeedback('Opening Settings');
       return;
@@ -189,11 +249,3 @@ const VoiceCommandSystem = ({ onNavigate, onEmergency }: VoiceCommandSystemProps
 };
 
 export default VoiceCommandSystem;
-
-// Add TypeScript declarations for Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
