@@ -4,6 +4,7 @@ import LearnMore from './pages/LearnMore';
 import AuthPage from './pages/AuthPage';
 import MainApp from './pages/MainApp';
 import SignLanguageGuide from './pages/SignLanguageGuide';
+import BanglaSignGuide from './pages/BanglaSignGuide';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
 
@@ -27,6 +28,7 @@ function App() {
             <Route path="/" component={LandingPage} />
             <Route path="/learn-more" component={LearnMore} />
             <Route path="/sign-language-guide" component={SignLanguageGuide} />
+            <Route path="/bangla-sign-guide" component={BanglaSignGuide} />
             <Route path="/auth" component={AuthPage} />
             
             {/* Protected Routes */}
