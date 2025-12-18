@@ -67,6 +67,17 @@ export async function registerRoutes(
       // Check demo accounts first
       const demoAccount = DEMO_ACCOUNTS[email];
       if (demoAccount && demoAccount.password === password) {
+        // Ensure profile exists for demo account
+        let profile = await storage.getProfileById(demoAccount.id);
+        if (!profile) {
+          profile = await storage.createProfile({
+            id: demoAccount.id,
+            email,
+            name: email.split('@')[0],
+            role: demoAccount.role
+          });
+        }
+        
         // Log activity
         await storage.createActivity({
           userId: demoAccount.id,
@@ -75,7 +86,6 @@ export async function registerRoutes(
           description: `User logged in as ${demoAccount.role}`
         });
         
-        const profile = await storage.getProfileById(demoAccount.id);
         return res.json({ success: true, profile });
       }
 
