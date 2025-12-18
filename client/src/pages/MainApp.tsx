@@ -1,217 +1,231 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EmergencyProvider, useEmergency } from '../context/EmergencyContext';
-import { useAccessibility } from '../context/AccessibilityContext';
-import SignDetector from '../components/SignDetector';
-import TextToSign from '../components/TextToSign';
-import EmergencyOverlay from '../components/EmergencyOverlay';
-import MeetSystem from '../components/MeetSystem';
-import { PoliceDashboard } from '../components/PoliceDashboard';
-import { ParentDashboard } from '../components/ParentDashboard';
-import AccessibilitySettings from '../components/AccessibilitySettings';
-import EmergencyProfileCard from '../components/EmergencyProfileCard';
-import VoiceCommandSystem from '../components/VoiceCommandSystem';
-import QuickAccessibilityToolbar from '../components/QuickAccessibilityToolbar';
-import CaregiverMode from '../components/CaregiverMode';
-import { 
-  Bell, User, 
-  LayoutDashboard, Video, Settings, LogOut,
-  Accessibility, Users
-} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Save, Loader2, MapPin, Phone, User, AlertCircle } from 'lucide-react';
+import type { Settings } from '@shared/schema';
 
-const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
-  const { logout, user } = useAuth();
-  const { setToolbarVisible } = useAccessibility();
-  
-  const menuItems = [
-    { id: 'app', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'meet', label: 'SafeMeet', icon: Video },
-    { id: 'accessibility', label: 'Accessibility', icon: Accessibility },
-    { id: 'caregiver', label: 'Caregiver Mode', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
-
-  return (
-    <div className="w-20 lg:w-64 bg-white border-r border-slate-100 flex flex-col h-screen fixed left-0 top-0 z-50">
-      <div className="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-100">
-        <img src="/logo.png" alt="SafeBridge" className="w-10 h-10 object-contain" />
-        <span className="hidden lg:block ml-3 font-display font-bold text-xl text-slate-800">SafeBridge</span>
-      </div>
-
-      <div className="flex-1 py-6 px-3 space-y-2">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center p-3 rounded-xl transition-all ${
-              activeTab === item.id 
-                ? 'bg-primary text-white shadow-lg shadow-blue-500/20' 
-                : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            <item.icon size={24} />
-            <span className="hidden lg:block ml-3 font-medium">{item.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="p-4 border-t border-slate-100 space-y-2">
-        <button
-          data-testid="button-quick-accessibility"
-          onClick={() => setToolbarVisible(true)}
-          className="w-full flex items-center justify-center lg:justify-start p-3 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-        >
-          <Accessibility size={20} />
-          <span className="hidden lg:block ml-3 font-medium text-sm">Quick Settings</span>
-        </button>
-        <div className="flex items-center gap-3 mb-2 px-2">
-          <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
-            <User size={20} />
-          </div>
-          <div className="hidden lg:block overflow-hidden">
-            <p className="font-bold text-slate-800 text-sm truncate">{user?.name}</p>
-            <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
-          </div>
-        </div>
-        <button 
-          data-testid="button-logout"
-          onClick={logout}
-          className="w-full flex items-center justify-center lg:justify-start p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-        >
-          <LogOut size={20} />
-          <span className="hidden lg:block ml-3 font-medium">Sign Out</span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const DashboardContent = ({ onNavigateToSettings }: { onNavigateToSettings: () => void }) => {
+const SettingsPage = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   
-  if (user?.role === 'police') {
-    return <PoliceDashboard />;
-  }
-  
-  if (user?.role === 'parent') {
-    return <ParentDashboard />;
-  }
+  const [settings, setSettings] = useState<Settings>({
+    phoneNumber: '',
+    location: '',
+    contactDetails: '',
+    parentInfo: {
+      name: '',
+      email: '',
+      phone: '',
+    },
+    emergencyContact: '',
+  });
 
-  // Default User Dashboard
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
-      <div className="lg:col-span-8 flex flex-col gap-6">
-         <div className="bg-white rounded-3xl shadow-soft border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center gap-2">
-               <h2 className="font-display font-bold text-xl text-slate-800">Live Translator</h2>
-               <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wide">Active</span>
-            </div>
-            <div className="flex-1 p-1">
-               <SignDetector />
-            </div>
-         </div>
-      </div>
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user) return;
+      try {
+        const res = await fetch(`/api/settings/${user.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSettings({
+            phoneNumber: data.phoneNumber || '',
+            location: data.location || '',
+            contactDetails: data.contactDetails || '',
+            parentInfo: data.parentInfo || { name: '', email: '', phone: '' },
+            emergencyContact: data.emergencyContact || '',
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      } finally {
+        setFetching(false);
+      }
+    };
 
-      <div className="lg:col-span-4 flex flex-col gap-6">
-        <EmergencyProfileCard onNavigateToSettings={onNavigateToSettings} />
-        <div className="flex-1">
-          <TextToSign />
-        </div>
-      </div>
-    </div>
-  );
-};
+    loadSettings();
+  }, [user]);
 
-const getTabTitle = (tab: string) => {
-  const titles: Record<string, string> = {
-    app: 'Dashboard',
-    meet: 'SafeMeet',
-    accessibility: 'Accessibility',
-    caregiver: 'Caregiver Mode',
-    settings: 'Settings'
+  const handleSave = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/settings/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+
+      if (!res.ok) throw new Error('Failed to save settings');
+      
+      toast({
+        title: 'Success',
+        description: 'Your settings have been saved.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save settings',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
-  return titles[tab] || 'Dashboard';
-};
 
-const MainAppContent = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
-  const { triggerEmergency } = useEmergency();
-  const { setToolbarVisible } = useAccessibility();
-
-  return (
-    <>
-      {/* Voice Command System */}
-      <VoiceCommandSystem 
-        onNavigate={setActiveTab}
-        onEmergency={triggerEmergency}
-      />
-      
-      {/* Quick Accessibility Toolbar */}
-      <QuickAccessibilityToolbar />
-      
-      <EmergencyOverlay />
-      
-      {activeTab === 'app' && <DashboardContent />}
-      
-      {activeTab === 'meet' && (
-        <div className="h-[calc(100vh-12rem)]">
-          <MeetSystem />
-        </div>
-      )}
-      
-      {activeTab === 'accessibility' && (
-        <div className="space-y-6">
-          <AccessibilitySettings />
-          <div className="flex justify-center">
-            <button
-              data-testid="button-show-toolbar"
-              onClick={() => setToolbarVisible(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-100 text-indigo-700 rounded-xl font-medium hover:bg-indigo-200 transition-colors"
-            >
-              <Accessibility size={20} />
-              Show Quick Toolbar
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {activeTab === 'caregiver' && <CaregiverMode />}
-      
-      {activeTab === 'settings' && <AccessibilitySettings />}
-    </>
-  );
-};
-
-const MainApp = () => {
-  const [activeTab, setActiveTab] = useState('app');
+  if (fetching) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
-      <main className="flex-1 ml-20 lg:ml-64 p-6 lg:p-12 overflow-y-auto">
-        <div className="max-w-[1600px] mx-auto">
-          <header className="flex justify-between items-center gap-4 mb-8">
-            <h1 className="text-2xl font-display font-bold text-slate-800">
-              {getTabTitle(activeTab)}
-            </h1>
-            <div className="flex gap-4">
-              <button 
-                data-testid="button-notifications"
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 text-slate-500 relative"
-              >
-                <Bell size={20} />
-                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-              </button>
-            </div>
-          </header>
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900 mb-1">Personal Settings</h2>
+        <p className="text-sm text-slate-500">Manage your profile and contact information</p>
+      </div>
 
-          <EmergencyProvider>
-            <MainAppContent activeTab={activeTab} setActiveTab={setActiveTab} />
-          </EmergencyProvider>
+      <Card className="p-6 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            <Phone className="w-4 h-4 inline mr-2" />
+            Phone Number
+          </label>
+          <Input
+            data-testid="input-phone"
+            type="tel"
+            value={settings.phoneNumber}
+            onChange={(e) => setSettings({ ...settings, phoneNumber: e.target.value })}
+            placeholder="Your phone number"
+            className="w-full"
+          />
         </div>
-      </main>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            <MapPin className="w-4 h-4 inline mr-2" />
+            Location
+          </label>
+          <Input
+            data-testid="input-location"
+            value={settings.location}
+            onChange={(e) => setSettings({ ...settings, location: e.target.value })}
+            placeholder="Your location (e.g., Dhaka, Bangladesh)"
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Contact Details
+          </label>
+          <Textarea
+            data-testid="input-contact"
+            value={settings.contactDetails}
+            onChange={(e) => setSettings({ ...settings, contactDetails: e.target.value })}
+            placeholder="Additional contact information"
+            className="w-full min-h-[100px]"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            <AlertCircle className="w-4 h-4 inline mr-2" />
+            Emergency Contact
+          </label>
+          <Input
+            data-testid="input-emergency"
+            value={settings.emergencyContact}
+            onChange={(e) => setSettings({ ...settings, emergencyContact: e.target.value })}
+            placeholder="Emergency contact person or number"
+            className="w-full"
+          />
+        </div>
+      </Card>
+
+      <Card className="p-6 space-y-4 border-slate-200 bg-slate-50">
+        <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <User className="w-5 h-5" />
+          Parent/Caregiver Information
+        </h3>
+        
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Name
+          </label>
+          <Input
+            data-testid="input-parent-name"
+            value={settings.parentInfo?.name || ''}
+            onChange={(e) => setSettings({
+              ...settings,
+              parentInfo: { ...settings.parentInfo, name: e.target.value },
+            })}
+            placeholder="Parent or caregiver name"
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Email
+          </label>
+          <Input
+            data-testid="input-parent-email"
+            type="email"
+            value={settings.parentInfo?.email || ''}
+            onChange={(e) => setSettings({
+              ...settings,
+              parentInfo: { ...settings.parentInfo, email: e.target.value },
+            })}
+            placeholder="Parent or caregiver email"
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Phone
+          </label>
+          <Input
+            data-testid="input-parent-phone"
+            type="tel"
+            value={settings.parentInfo?.phone || ''}
+            onChange={(e) => setSettings({
+              ...settings,
+              parentInfo: { ...settings.parentInfo, phone: e.target.value },
+            })}
+            placeholder="Parent or caregiver phone"
+            className="w-full"
+          />
+        </div>
+      </Card>
+
+      <div className="flex gap-3 justify-end">
+        <Button
+          data-testid="button-save-settings"
+          onClick={handleSave}
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          Save Settings
+        </Button>
+      </div>
     </div>
   );
 };
 
-export default MainApp;
+export default SettingsPage;

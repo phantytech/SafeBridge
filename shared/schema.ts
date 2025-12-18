@@ -8,6 +8,11 @@ export const profiles = pgTable("profiles", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   role: text("role").notNull().$type<"user" | "parent" | "police">(),
+  phoneNumber: text("phone_number"),
+  location: text("location"),
+  contactDetails: text("contact_details"),
+  parentInfo: jsonb("parent_info").$type<{ name?: string; email?: string; phone?: string } | null>(),
+  emergencyContact: text("emergency_contact"),
   createdAt: timestamp("created_at").default(sql`now()`).notNull(),
   updatedAt: timestamp("updated_at").default(sql`now()`).notNull(),
 });
@@ -28,6 +33,18 @@ export const insertProfileSchema = createInsertSchema(profiles).omit({
   updatedAt: true,
 });
 
+export const settingsSchema = z.object({
+  phoneNumber: z.string().optional(),
+  location: z.string().optional(),
+  contactDetails: z.string().optional(),
+  parentInfo: z.object({
+    name: z.string().optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+  }).optional(),
+  emergencyContact: z.string().optional(),
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   createdAt: true,
@@ -35,5 +52,6 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
 
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
 export type Profile = typeof profiles.$inferSelect;
+export type Settings = z.infer<typeof settingsSchema>;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;
