@@ -81,7 +81,7 @@ export async function registerRoutes(
         // Log activity
         await storage.createActivity({
           userId: demoAccount.id,
-          role: demoAccount.role,
+          role: demoAccount.role as "user" | "parent" | "police",
           activityType: 'login',
           description: `User logged in as ${demoAccount.role}`
         });
@@ -176,7 +176,10 @@ export async function registerRoutes(
   app.post("/api/activity", async (req, res) => {
     try {
       const body = insertActivitySchema.parse(req.body);
-      const activity = await storage.createActivity(body);
+      const activity = await storage.createActivity({
+        ...body,
+        role: body.role as "user" | "parent" | "police"
+      });
       res.json(activity);
     } catch (error) {
       res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
