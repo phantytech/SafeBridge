@@ -1,231 +1,236 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Save, Loader2, MapPin, Phone, User, AlertCircle } from 'lucide-react';
-import type { Settings } from '@shared/schema';
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { insertProfileSchema, insertActivitySchema, settingsSchema } from "@shared/schema";
+import { z } from "zod";
+import { supabase } from "./supabase";
 
-const SettingsPage = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  
-  const [settings, setSettings] = useState<Settings>({
-    phoneNumber: '',
-    location: '',
-    contactDetails: '',
-    parentInfo: {
-      name: '',
-      email: '',
-      phone: '',
-    },
-    emergencyContact: '',
-  });
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      if (!user) return;
-      try {
-        const res = await fetch(`/api/settings/${user.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSettings({
-            phoneNumber: data.phoneNumber || '',
-            location: data.location || '',
-            contactDetails: data.contactDetails || '',
-            parentInfo: data.parentInfo || { name: '', email: '', phone: '' },
-            emergencyContact: data.emergencyContact || '',
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load settings:', error);
-      } finally {
-        setFetching(false);
-      }
-    };
-
-    loadSettings();
-  }, [user]);
-
-  const handleSave = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/settings/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-
-      if (!res.ok) throw new Error('Failed to save settings');
-      
-      toast({
-        title: 'Success',
-        description: 'Your settings have been saved.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to save settings',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (fetching) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-1">Personal Settings</h2>
-        <p className="text-sm text-slate-500">Manage your profile and contact information</p>
-      </div>
-
-      <Card className="p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            <Phone className="w-4 h-4 inline mr-2" />
-            Phone Number
-          </label>
-          <Input
-            data-testid="input-phone"
-            type="tel"
-            value={settings.phoneNumber}
-            onChange={(e) => setSettings({ ...settings, phoneNumber: e.target.value })}
-            placeholder="Your phone number"
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            <MapPin className="w-4 h-4 inline mr-2" />
-            Location
-          </label>
-          <Input
-            data-testid="input-location"
-            value={settings.location}
-            onChange={(e) => setSettings({ ...settings, location: e.target.value })}
-            placeholder="Your location (e.g., Dhaka, Bangladesh)"
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Contact Details
-          </label>
-          <Textarea
-            data-testid="input-contact"
-            value={settings.contactDetails}
-            onChange={(e) => setSettings({ ...settings, contactDetails: e.target.value })}
-            placeholder="Additional contact information"
-            className="w-full min-h-[100px]"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            <AlertCircle className="w-4 h-4 inline mr-2" />
-            Emergency Contact
-          </label>
-          <Input
-            data-testid="input-emergency"
-            value={settings.emergencyContact}
-            onChange={(e) => setSettings({ ...settings, emergencyContact: e.target.value })}
-            placeholder="Emergency contact person or number"
-            className="w-full"
-          />
-        </div>
-      </Card>
-
-      <Card className="p-6 space-y-4 border-slate-200 bg-slate-50">
-        <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <User className="w-5 h-5" />
-          Parent/Caregiver Information
-        </h3>
-        
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Name
-          </label>
-          <Input
-            data-testid="input-parent-name"
-            value={settings.parentInfo?.name || ''}
-            onChange={(e) => setSettings({
-              ...settings,
-              parentInfo: { ...settings.parentInfo, name: e.target.value },
-            })}
-            placeholder="Parent or caregiver name"
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Email
-          </label>
-          <Input
-            data-testid="input-parent-email"
-            type="email"
-            value={settings.parentInfo?.email || ''}
-            onChange={(e) => setSettings({
-              ...settings,
-              parentInfo: { ...settings.parentInfo, email: e.target.value },
-            })}
-            placeholder="Parent or caregiver email"
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Phone
-          </label>
-          <Input
-            data-testid="input-parent-phone"
-            type="tel"
-            value={settings.parentInfo?.phone || ''}
-            onChange={(e) => setSettings({
-              ...settings,
-              parentInfo: { ...settings.parentInfo, phone: e.target.value },
-            })}
-            placeholder="Parent or caregiver phone"
-            className="w-full"
-          />
-        </div>
-      </Card>
-
-      <div className="flex gap-3 justify-end">
-        <Button
-          data-testid="button-save-settings"
-          onClick={handleSave}
-          disabled={loading}
-          className="flex items-center gap-2"
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          Save Settings
-        </Button>
-      </div>
-    </div>
-  );
+// Demo accounts for testing
+const DEMO_ACCOUNTS: Record<string, { password: string; role: string; id: string }> = {
+  "demo.user@example.com": { password: "demo.user@example.com", role: "user", id: "user-demo-1" },
+  "demo.parent@example.com": { password: "demo.parent@example.com", role: "parent", id: "parent-demo-1" },
+  "demo.police@example.com": { password: "demo.police@example.com", role: "police", id: "police-demo-1" },
 };
 
-export default SettingsPage;
+export async function registerRoutes(
+  httpServer: Server,
+  app: Express
+): Promise<Server> {
+  // Auth routes
+  app.post("/api/auth/profile", async (req, res) => {
+    try {
+      const body = insertProfileSchema.parse(req.body);
+      const profile = await storage.createProfile(body);
+      res.json(profile);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.get("/api/auth/profile/:id", async (req, res) => {
+    try {
+      const profile = await storage.getProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.get("/api/auth/profile-by-email", async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      if (!email) {
+        return res.status(400).json({ error: "Email query parameter required" });
+      }
+      const profile = await storage.getProfileByEmail(email);
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  // Login endpoint - supports both demo and Supabase auth
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password, role } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password required" });
+      }
+
+      // Check demo accounts first
+      const demoAccount = DEMO_ACCOUNTS[email];
+      if (demoAccount && demoAccount.password === password) {
+        // Ensure profile exists for demo account
+        let profile = await storage.getProfileById(demoAccount.id);
+        if (!profile) {
+          profile = await storage.createProfile({
+            id: demoAccount.id,
+            email,
+            name: email.split('@')[0],
+            role: demoAccount.role
+          });
+        }
+        
+        // Log activity
+        await storage.createActivity({
+          userId: demoAccount.id,
+          role: demoAccount.role as "user" | "parent" | "police",
+          activityType: 'login',
+          description: `User logged in as ${demoAccount.role}`
+        });
+        
+        return res.json({ success: true, profile });
+      }
+
+      // Try Supabase auth
+      if (!supabase) {
+        return res.status(400).json({ error: "Supabase not configured" });
+      }
+      
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (authError) throw authError;
+      if (!data.user) throw new Error("Login failed");
+
+      // Get or create profile
+      let profile = await storage.getProfileByEmail(email);
+      if (!profile) {
+        profile = await storage.createProfile({
+          email,
+          name: data.user.user_metadata?.name || email.split('@')[0],
+          role: role || data.user.user_metadata?.role || 'user'
+        });
+      }
+
+      // Log activity
+      await storage.createActivity({
+        userId: data.user.id,
+        role: profile.role,
+        activityType: 'login',
+        description: `User logged in as ${profile.role}`
+      });
+
+      res.json({ success: true, profile });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Login failed" });
+    }
+  });
+
+  // Signup endpoint
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { email, password, name, role } = req.body;
+      
+      if (!email || !password || !name || !role) {
+        return res.status(400).json({ error: "Missing required fields: email, password, name, role" });
+      }
+
+      // Create Supabase auth user
+      if (!supabase) {
+        return res.status(400).json({ error: "Supabase not configured" });
+      }
+      
+      const { data: { user }, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name, role }
+        }
+      });
+
+      if (authError) throw authError;
+      if (!user) throw new Error("Failed to create user");
+
+      // Create profile in database
+      const profile = await storage.createProfile({
+        email,
+        name,
+        role
+      });
+
+      // Log signup activity
+      await storage.createActivity({
+        userId: user.id,
+        role,
+        activityType: 'signup',
+        description: `New ${role} account created`
+      });
+
+      res.json({ success: true, profile });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Signup failed" });
+    }
+  });
+
+  // Activity routes
+  app.post("/api/activity", async (req, res) => {
+    try {
+      const body = insertActivitySchema.parse(req.body);
+      const activity = await storage.createActivity({
+        ...body,
+        role: body.role as "user" | "parent" | "police"
+      });
+      res.json(activity);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.get("/api/activity/user/:userId", async (req, res) => {
+    try {
+      const activities = await storage.getActivitiesByUserId(req.params.userId);
+      res.json(activities);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  // Settings routes
+  app.get("/api/settings/:userId", async (req, res) => {
+    try {
+      const profile = await storage.getProfileById(req.params.userId);
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      const settings = {
+        phoneNumber: profile.phoneNumber,
+        location: profile.location,
+        contactDetails: profile.contactDetails,
+        parentInfo: profile.parentInfo,
+        emergencyContact: profile.emergencyContact,
+      };
+      
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.patch("/api/settings/:userId", async (req, res) => {
+    try {
+      const body = settingsSchema.parse(req.body);
+      const profile = await storage.updateProfile(req.params.userId, body as any);
+      
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  return httpServer;
+}
