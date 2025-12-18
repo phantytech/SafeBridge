@@ -469,7 +469,7 @@ export const gestureDescriptions: Record<Exclude<DetectedGesture, null>, string>
 
 // Bangla translations for BdSL (Bangla Sign Language)
 export const bangladeshGestureNames: Record<Exclude<DetectedGesture, null>, string> = {
-  "HELLO": "নমস্কার",
+  "HELLO": "আসসালামু আলাইকুম",
   "YES": "হ্যাঁ",
   "SOS": "জরুরি সাহায্য",
   "PEACE": "শান্তি",
