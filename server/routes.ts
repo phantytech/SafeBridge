@@ -80,6 +80,10 @@ export async function registerRoutes(
       }
 
       // Try Supabase auth
+      if (!supabase) {
+        return res.status(400).json({ error: "Supabase not configured" });
+      }
+      
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -92,7 +96,6 @@ export async function registerRoutes(
       let profile = await storage.getProfileByEmail(email);
       if (!profile) {
         profile = await storage.createProfile({
-          id: data.user.id,
           email,
           name: data.user.user_metadata?.name || email.split('@')[0],
           role: role || data.user.user_metadata?.role || 'user'
@@ -123,6 +126,10 @@ export async function registerRoutes(
       }
 
       // Create Supabase auth user
+      if (!supabase) {
+        return res.status(400).json({ error: "Supabase not configured" });
+      }
+      
       const { data: { user }, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -136,7 +143,6 @@ export async function registerRoutes(
 
       // Create profile in database
       const profile = await storage.createProfile({
-        id: user.id,
         email,
         name,
         role
