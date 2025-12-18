@@ -14,6 +14,7 @@ const SignDetector: React.FC = () => {
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(null);
   const [gesture, setGesture] = useState<DetectedGesture>(null);
   const [loading, setLoading] = useState(true);
+  const [detectionMode, setDetectionMode] = useState<'ASL' | 'BdSL'>('ASL');
   
   const { triggerEmergency } = useEmergency();
   
@@ -80,7 +81,7 @@ const SignDetector: React.FC = () => {
           radius: 4
         });
 
-        const currentGesture = detectGesture(landmarks);
+        const currentGesture = detectGesture(landmarks, detectionMode);
         setGesture(currentGesture);
         
         if (currentGesture === "SOS") {
@@ -187,7 +188,33 @@ const SignDetector: React.FC = () => {
       {/* Live Translation Bar */}
       <div className="h-28 bg-white border-t border-slate-100 p-6 flex items-center justify-between">
         <div className="flex-1">
-           <p className="text-slate-400 text-xs font-bold tracking-wider uppercase mb-1">Detected Gesture</p>
+           <div className="flex items-center gap-3 mb-1">
+             <p className="text-slate-400 text-xs font-bold tracking-wider uppercase">Detected Gesture</p>
+             <div className="flex gap-2 ml-2">
+               <button
+                 onClick={() => setDetectionMode('ASL')}
+                 data-testid="button-mode-asl"
+                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                   detectionMode === 'ASL'
+                     ? 'bg-primary text-white'
+                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                 }`}
+               >
+                 ASL
+               </button>
+               <button
+                 onClick={() => setDetectionMode('BdSL')}
+                 data-testid="button-mode-bdsl"
+                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                   detectionMode === 'BdSL'
+                     ? 'bg-primary text-white'
+                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                 }`}
+               >
+                 BdSL
+               </button>
+             </div>
+           </div>
            <div className="flex items-center justify-between">
              <div className="h-12 flex items-center">
                 {gesture ? (
