@@ -21,6 +21,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const checkSession = async () => {
       try {
+        if (!supabase) return;
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUser({
@@ -36,6 +37,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     checkSession();
 
+    if (!supabase) return;
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser({
@@ -76,7 +79,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         role: profile.role
       });
       
-      setLocation('/dashboard');
+      // Redirect to saved URL or dashboard
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      localStorage.removeItem('redirectAfterLogin');
+      setLocation(redirectUrl || '/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -88,49 +94,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signup = async (name: string, email: string, password: string, role: User['role']) => {
     try {
       setIsLoading(true);
-      const { data: { user }, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role
-          }
-        }
+      
+      // Use backend signup endpoint (works with or without Supabase)
+      const signupRes = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, role })
       });
-      if (error) throw error;
-      
-      // Create profile in database
-      if (user) {
-        const profileRes = await fetch('/api/auth/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: user.id,
-            email,
-            name,
-            role
-          })
-        });
-        
-        if (!profileRes.ok) {
-          throw new Error('Failed to create user profile');
-        }
-        
-        // Log signup activity
-        await fetch('/api/activity', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id,
-            role,
-            activityType: 'signup',
-            description: `New ${role} account created`
-          })
-        });
+
+      if (!signupRes.ok) {
+        const errData = await signupRes.json();
+        throw new Error(errData.error || 'Signup failed');
       }
+
+      const { profile } = await signupRes.json();
+      setUser({
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role
+      });
       
-      setLocation('/dashboard');
+      // Redirect to saved URL or dashboard
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      localStorage.removeItem('redirectAfterLogin');
+      setLocation(redirectUrl || '/dashboard');
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
@@ -159,8 +147,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
       
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (supabase) {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      }
       setUser(null);
       setLocation('/');
     } catch (error) {

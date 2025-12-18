@@ -1,9 +1,134 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertProfileSchema, insertActivitySchema } from "@shared/schema";
+import { insertProfileSchema, insertActivitySchema, settingsSchema, insertEmergencyAlertSchema } from "@shared/schema";
 import { z } from "zod";
 import { supabase } from "./supabase";
+
+// WebRTC Signaling - rooms store connected peers by meet code
+const rooms = new Map<string, Map<string, WebSocket>>();
+
+function setupWebSocketSignaling(httpServer: Server) {
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Handle upgrade requests only for our signaling path
+  httpServer.on('upgrade', (request, socket, head) => {
+    const pathname = request.url;
+    
+    if (pathname === '/ws/signaling') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+    // Let other upgrade requests (like Vite HMR) pass through
+  });
+
+  wss.on('connection', (ws) => {
+    let currentRoom: string | null = null;
+    let currentUserId: string | null = null;
+
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        switch (message.type) {
+          case 'join': {
+            const { meetCode, userId } = message;
+            currentRoom = meetCode;
+            currentUserId = userId;
+            
+            if (!rooms.has(meetCode)) {
+              rooms.set(meetCode, new Map());
+            }
+            
+            const room = rooms.get(meetCode)!;
+            
+            // Check if room is full (max 2 participants)
+            if (room.size >= 2 && !room.has(userId)) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+              return;
+            }
+            
+            // Notify existing peers about new user
+            room.forEach((peerWs, peerId) => {
+              if (peerId !== userId && peerWs.readyState === WebSocket.OPEN) {
+                peerWs.send(JSON.stringify({ type: 'user-joined', userId }));
+              }
+            });
+            
+            // Get existing peer IDs for the new user
+            const existingPeers = Array.from(room.keys()).filter(id => id !== userId);
+            
+            room.set(userId, ws);
+            
+            ws.send(JSON.stringify({ 
+              type: 'joined', 
+              meetCode, 
+              existingPeers,
+              isInitiator: existingPeers.length > 0 
+            }));
+            break;
+          }
+          
+          case 'offer':
+          case 'answer':
+          case 'ice-candidate': {
+            const { targetUserId, ...payload } = message;
+            if (currentRoom && rooms.has(currentRoom)) {
+              const room = rooms.get(currentRoom)!;
+              const targetWs = room.get(targetUserId);
+              if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                targetWs.send(JSON.stringify({ ...payload, fromUserId: currentUserId }));
+              }
+            }
+            break;
+          }
+          
+          case 'leave': {
+            if (currentRoom && currentUserId && rooms.has(currentRoom)) {
+              const room = rooms.get(currentRoom)!;
+              room.delete(currentUserId);
+              
+              // Notify other peers
+              room.forEach((peerWs) => {
+                if (peerWs.readyState === WebSocket.OPEN) {
+                  peerWs.send(JSON.stringify({ type: 'user-left', userId: currentUserId }));
+                }
+              });
+              
+              if (room.size === 0) {
+                rooms.delete(currentRoom);
+              }
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      if (currentRoom && currentUserId && rooms.has(currentRoom)) {
+        const room = rooms.get(currentRoom)!;
+        room.delete(currentUserId);
+        
+        room.forEach((peerWs) => {
+          if (peerWs.readyState === WebSocket.OPEN) {
+            peerWs.send(JSON.stringify({ type: 'user-left', userId: currentUserId }));
+          }
+        });
+        
+        if (room.size === 0) {
+          rooms.delete(currentRoom);
+        }
+      }
+    });
+  });
+
+  console.log('WebSocket signaling server initialized');
+}
 
 // Demo accounts for testing
 const DEMO_ACCOUNTS: Record<string, { password: string; role: string; id: string }> = {
@@ -16,6 +141,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Initialize WebSocket signaling for WebRTC
+  setupWebSocketSignaling(httpServer);
+
   // Auth routes
   app.post("/api/auth/profile", async (req, res) => {
     try {
@@ -67,19 +195,33 @@ export async function registerRoutes(
       // Check demo accounts first
       const demoAccount = DEMO_ACCOUNTS[email];
       if (demoAccount && demoAccount.password === password) {
+        // Ensure profile exists for demo account
+        let profile = await storage.getProfileById(demoAccount.id);
+        if (!profile) {
+          profile = await storage.createProfile({
+            id: demoAccount.id,
+            email,
+            name: email.split('@')[0],
+            role: demoAccount.role
+          });
+        }
+        
         // Log activity
         await storage.createActivity({
           userId: demoAccount.id,
-          role: demoAccount.role,
+          role: demoAccount.role as "user" | "parent" | "police",
           activityType: 'login',
           description: `User logged in as ${demoAccount.role}`
         });
         
-        const profile = await storage.getProfileById(demoAccount.id);
         return res.json({ success: true, profile });
       }
 
       // Try Supabase auth
+      if (!supabase) {
+        return res.status(400).json({ error: "Supabase not configured" });
+      }
+      
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -92,7 +234,6 @@ export async function registerRoutes(
       let profile = await storage.getProfileByEmail(email);
       if (!profile) {
         profile = await storage.createProfile({
-          id: data.user.id,
           email,
           name: data.user.user_metadata?.name || email.split('@')[0],
           role: role || data.user.user_metadata?.role || 'user'
@@ -123,6 +264,10 @@ export async function registerRoutes(
       }
 
       // Create Supabase auth user
+      if (!supabase) {
+        return res.status(400).json({ error: "Supabase not configured" });
+      }
+      
       const { data: { user }, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -136,7 +281,6 @@ export async function registerRoutes(
 
       // Create profile in database
       const profile = await storage.createProfile({
-        id: user.id,
         email,
         name,
         role
@@ -160,7 +304,10 @@ export async function registerRoutes(
   app.post("/api/activity", async (req, res) => {
     try {
       const body = insertActivitySchema.parse(req.body);
-      const activity = await storage.createActivity(body);
+      const activity = await storage.createActivity({
+        ...body,
+        role: body.role as "user" | "parent" | "police"
+      });
       res.json(activity);
     } catch (error) {
       res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
@@ -171,6 +318,174 @@ export async function registerRoutes(
     try {
       const activities = await storage.getActivitiesByUserId(req.params.userId);
       res.json(activities);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  // Settings routes
+  app.get("/api/settings/:userId", async (req, res) => {
+    try {
+      const profile = await storage.getProfileById(req.params.userId);
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      const settings = {
+        phoneNumber: profile.phoneNumber,
+        location: profile.location,
+        contactDetails: profile.contactDetails,
+        parentInfo: profile.parentInfo,
+        emergencyContact: profile.emergencyContact,
+      };
+      
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.patch("/api/settings/:userId", async (req, res) => {
+    try {
+      const body = settingsSchema.parse(req.body);
+      const profile = await storage.updateProfile(req.params.userId, body as any);
+      
+      if (!profile) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  // Emergency Alert Routes
+  app.post("/api/emergency/alert", async (req, res) => {
+    try {
+      const { userId, userName, userPhone, latitude, longitude, address } = req.body;
+      
+      if (!userId || !userName) {
+        return res.status(400).json({ error: "Missing required fields: userId, userName" });
+      }
+
+      // Create emergency alert
+      const alert = await storage.createEmergencyAlert({
+        userId,
+        userName,
+        userPhone,
+        latitude: latitude ? parseFloat(latitude) : undefined,
+        longitude: longitude ? parseFloat(longitude) : undefined,
+        address,
+        status: "active"
+      } as any);
+
+      // Log activity
+      await storage.createActivity({
+        userId,
+        role: "user",
+        activityType: "emergency_alert",
+        description: `Emergency SOS triggered${latitude && longitude ? ` at ${address}` : ''}`
+      });
+
+      res.json(alert);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.get("/api/emergency/alerts", async (req, res) => {
+    try {
+      const alerts = await storage.getEmergencyAlerts();
+      res.json(alerts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.patch("/api/emergency/alert/:alertId/resolve", async (req, res) => {
+    try {
+      const alert = await storage.resolveEmergencyAlert(req.params.alertId);
+      
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      
+      res.json(alert);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  // Meeting Routes (SafeMeet)
+  app.post("/api/meets", async (req, res) => {
+    try {
+      const { createdByUserId, createdByName } = req.body;
+      
+      if (!createdByUserId || !createdByName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Generate unique meet code (6-7 character alphanumeric like Google Meet)
+      const meetCode = Math.random().toString(36).substring(2, 9).toLowerCase();
+      
+      const meeting = await storage.createMeeting({
+        meetCode,
+        createdByUserId,
+        createdByName,
+        status: "active",
+        participants: []
+      } as any);
+
+      res.json(meeting);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.get("/api/meets/:meetCode", async (req, res) => {
+    try {
+      const meeting = await storage.getMeetingByCode(req.params.meetCode);
+      
+      if (!meeting) {
+        return res.status(404).json({ error: "Meet not found" });
+      }
+      
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.post("/api/meets/:meetCode/join", async (req, res) => {
+    try {
+      const { userId, userName } = req.body;
+      const meeting = await storage.getMeetingByCode(req.params.meetCode);
+      
+      if (!meeting) {
+        return res.status(404).json({ error: "Meet not found" });
+      }
+
+      const updated = await storage.addMeetingParticipant(meeting.id, userId, userName);
+      res.json(updated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("Meeting is full")) {
+        return res.status(409).json({ error: message });
+      }
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.patch("/api/meets/:meetId/end", async (req, res) => {
+    try {
+      const meeting = await storage.endMeeting(req.params.meetId);
+      
+      if (!meeting) {
+        return res.status(404).json({ error: "Meet not found" });
+      }
+      
+      res.json(meeting);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
     }

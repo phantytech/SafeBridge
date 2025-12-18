@@ -12,6 +12,7 @@ The core features include:
 - Comprehensive accessibility settings (high contrast, large text, voice control, screen reader support)
 - Caregiver linking and monitoring capabilities
 - Video conferencing with sign language support (SafeMeet)
+- User settings page for personal information, phone number, location, and parent/caregiver details
 
 ## User Preferences
 
@@ -38,7 +39,7 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM with PostgreSQL dialect
 - **Schema Location**: `shared/schema.ts` contains table definitions
 - **Tables**: 
-  - `profiles`: User profiles with role-based access (user/parent/police)
+  - `profiles`: User profiles with role-based access (user/parent/police), includes settings fields (phoneNumber, location, contactDetails, parentInfo, emergencyContact)
   - `activities`: Activity logging for user actions
 - **Migrations**: Drizzle Kit with `db:push` command
 

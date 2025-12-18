@@ -20,7 +20,17 @@ const areTouching = (p1: NormalizedLandmark, p2: NormalizedLandmark, threshold =
   return getDistance(p1, p2) < threshold;
 };
 
-export const detectGesture = (landmarks: NormalizedLandmark[]): DetectedGesture => {
+export const detectGesture = (landmarks: NormalizedLandmark[], mode: 'ASL' | 'BdSL' = 'ASL'): DetectedGesture => {
+  if (!landmarks || landmarks.length < 21) return null;
+  
+  // Route to appropriate detection function
+  if (mode === 'BdSL') {
+    return detectBdSLGesture(landmarks);
+  }
+  return detectASLGesture(landmarks);
+};
+
+const detectASLGesture = (landmarks: NormalizedLandmark[]): DetectedGesture => {
   if (!landmarks || landmarks.length < 21) return null;
 
   // Landmarks indices
@@ -230,6 +240,206 @@ export const detectGesture = (landmarks: NormalizedLandmark[]): DetectedGesture 
   return null;
 };
 
+const detectBdSLGesture = (landmarks: NormalizedLandmark[]): DetectedGesture => {
+  if (!landmarks || landmarks.length < 21) return null;
+
+  const wrist = landmarks[0];
+  
+  const thumbTip = landmarks[4];
+  const thumbIP = landmarks[3];
+  const thumbMCP = landmarks[2];
+  
+  const indexTip = landmarks[8];
+  const indexDIP = landmarks[7];
+  const indexPIP = landmarks[6];
+  const indexMCP = landmarks[5];
+  
+  const middleTip = landmarks[12];
+  const middleDIP = landmarks[11];
+  const middlePIP = landmarks[10];
+  const middleMCP = landmarks[9];
+  
+  const ringTip = landmarks[16];
+  const ringDIP = landmarks[15];
+  const ringPIP = landmarks[14];
+  const ringMCP = landmarks[13];
+  
+  const pinkyTip = landmarks[20];
+  const pinkyDIP = landmarks[19];
+  const pinkyPIP = landmarks[18];
+  const pinkyMCP = landmarks[17];
+
+  const isExtended = (tip: NormalizedLandmark, pip: NormalizedLandmark) => {
+    return getDistance(wrist, tip) > getDistance(wrist, pip) * 1.1;
+  };
+
+  const isCurled = (tip: NormalizedLandmark, pip: NormalizedLandmark) => {
+    return getDistance(wrist, tip) < getDistance(wrist, pip) * 0.85;
+  };
+
+  const thumbExtended = isExtended(thumbTip, thumbIP);
+  const indexExtended = isExtended(indexTip, indexPIP);
+  const middleExtended = isExtended(middleTip, middlePIP);
+  const ringExtended = isExtended(ringTip, ringPIP);
+  const pinkyExtended = isExtended(pinkyTip, pinkyPIP);
+
+  const indexCurled = isCurled(indexTip, indexPIP);
+  const middleCurled = isCurled(middleTip, middlePIP);
+  const ringCurled = isCurled(ringTip, ringPIP);
+  const pinkyCurled = isCurled(pinkyTip, pinkyPIP);
+  const thumbCurled = isCurled(thumbTip, thumbIP);
+
+  const extendedCount = [thumbExtended, indexExtended, middleExtended, ringExtended, pinkyExtended].filter(Boolean).length;
+
+  // BdSL (Bangla Sign Language) detection - similar structure but adapted for Bangla contexts
+  // 1. SOS/EMERGENCY - Same as ASL
+  if (indexCurled && middleCurled && ringCurled && pinkyCurled && thumbCurled) {
+    return "SOS";
+  }
+
+  // 2. HELP - thumb and index extended (common in Bengali sign language)
+  if (thumbExtended && indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "HELP";
+  }
+
+  // 3. OK - Thumb and index touching
+  if (areTouching(thumbTip, indexTip, 0.06) && middleExtended && ringExtended && pinkyExtended) {
+    return "OK";
+  }
+
+  // 4. YES - Thumbs up
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    const thumbPointingUp = thumbTip.y <= wrist.y;
+    if (thumbPointingUp) {
+      return "YES";
+    }
+  }
+
+  // 5. NO - Only index extended
+  if (indexExtended && !thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "NO";
+  }
+
+  // 6. THANK YOU - All fingers extended
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    return "THANK YOU";
+  }
+
+  // 7. LOVE - Thumb, index, and pinky extended
+  if (thumbExtended && indexExtended && middleCurled && ringCurled && pinkyExtended) {
+    return "LOVE";
+  }
+
+  // 8. STOP - Open palm with fingers together
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const fingersClose = getDistance(indexTip, pinkyTip) < 0.12;
+    if (fingersClose) {
+      return "STOP";
+    }
+  }
+
+  // 9. PEACE - Index and middle extended
+  if (indexExtended && middleExtended && !ringExtended && !pinkyExtended && !thumbExtended) {
+    return "PEACE";
+  }
+
+  // 10. PLEASE - Four fingers extended, no thumb
+  if (!thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    return "PLEASE";
+  }
+
+  // 11. BAD - Thumbs down
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    const thumbPointingDown = thumbTip.y > wrist.y + 0.1;
+    if (thumbPointingDown) {
+      return "BAD";
+    }
+  }
+
+  // 12. HELLO - All fingers extended spread
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const fingersSpread = getDistance(indexTip, pinkyTip) > 0.2;
+    if (fingersSpread) {
+      return "HELLO";
+    }
+  }
+
+  // 13. COME - Index finger beckoning
+  if (indexExtended && !thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "COME";
+  }
+
+  // 14. GO - Index extended with thumb
+  if (indexExtended && thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "GO";
+  }
+
+  // 15. EAT - Fingers bunched to mouth
+  if (areTouching(thumbTip, indexTip, 0.08) && areTouching(indexTip, middleTip, 0.08)) {
+    return "EAT";
+  }
+
+  // 16. DRINK - Thumb and pinky extended (phone gesture or drink gesture)
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
+    const thumbNearFace = thumbTip.y < 0.3;
+    if (thumbNearFace) {
+      return "DRINK";
+    }
+  }
+
+  // 17. CALL - Thumb and pinky like phone
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
+    const thumbNotNearFace = thumbTip.y > 0.3;
+    if (thumbNotNearFace) {
+      return "CALL";
+    }
+  }
+
+  // 18. SORRY - Thumb extended when all others folded
+  if (thumbExtended && indexCurled && middleCurled && ringCurled && pinkyCurled) {
+    return "SORRY";
+  }
+
+  // 19. GOOD - Similar to YES (thumbs up)
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "GOOD";
+  }
+
+  // 20. WAIT - All extended, level
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const fingersLevel = Math.abs(indexTip.y - pinkyTip.y) < 0.05;
+    if (fingersLevel) {
+      return "WAIT";
+    }
+  }
+
+  // 21. HAPPY - Fingers spread wide
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const fingersSpread = getDistance(indexTip, pinkyTip) > 0.2;
+    if (fingersSpread) {
+      return "HAPPY";
+    }
+  }
+
+  // 22. SLEEP - Palm against cheek
+  if (!thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const palmTilted = Math.abs(indexTip.x - pinkyTip.x) > 0.1;
+    if (palmTilted) {
+      return "SLEEP";
+    }
+  }
+
+  // 23. SAD - Index pointing down
+  if (indexExtended && !thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    const indexPointingDown = indexTip.y > indexPIP.y + 0.1;
+    if (indexPointingDown) {
+      return "SAD";
+    }
+  }
+
+  return null;
+};
+
 // Gesture descriptions for UI display
 export const gestureDescriptions: Record<Exclude<DetectedGesture, null>, string> = {
   "HELLO": "Open palm wave",
@@ -255,6 +465,41 @@ export const gestureDescriptions: Record<Exclude<DetectedGesture, null>, string>
   "SLEEP": "Palm against cheek",
   "HAPPY": "Spread fingers near face",
   "SAD": "Finger tracing tear"
+};
+
+// Bangla translations for BdSL (Bangla Sign Language)
+export const bangladeshGestureNames: Record<Exclude<DetectedGesture, null>, string> = {
+  "HELLO": "আসসালামু আলাইকুম",
+  "YES": "হ্যাঁ",
+  "SOS": "জরুরি সাহায্য",
+  "PEACE": "শান্তি",
+  "NO": "না",
+  "THANK YOU": "ধন্যবাদ",
+  "PLEASE": "দয়া করে",
+  "SORRY": "দুঃখিত",
+  "HELP": "সাহায্য",
+  "LOVE": "ভালোবাসা",
+  "GOOD": "ভালো",
+  "BAD": "খারাপ",
+  "STOP": "থামো",
+  "OK": "ঠিক আছে",
+  "CALL": "কল করো",
+  "WAIT": "অপেক্ষা করো",
+  "COME": "আসো",
+  "GO": "যাও",
+  "EAT": "খাও",
+  "DRINK": "পানীয়",
+  "SLEEP": "ঘুম",
+  "HAPPY": "খুশি",
+  "SAD": "দুঃখ"
+};
+
+// Get gesture name in the specified language
+export const getGestureName = (gesture: Exclude<DetectedGesture, null>, language: 'EN' | 'BN' = 'EN'): string => {
+  if (language === 'BN') {
+    return bangladeshGestureNames[gesture] || gesture;
+  }
+  return gesture;
 };
 
 // Get all available gestures

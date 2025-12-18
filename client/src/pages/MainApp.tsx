@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { useAuth } from '../context/AuthContext';
-import { EmergencyProvider, useEmergency } from '../context/EmergencyContext';
+import { EmergencyProvider, useEmergency, showEmergencyToast } from '../context/EmergencyContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import SignDetector from '../components/SignDetector';
 import TextToSign from '../components/TextToSign';
@@ -13,10 +14,13 @@ import EmergencyProfileCard from '../components/EmergencyProfileCard';
 import VoiceCommandSystem from '../components/VoiceCommandSystem';
 import QuickAccessibilityToolbar from '../components/QuickAccessibilityToolbar';
 import CaregiverMode from '../components/CaregiverMode';
+import SettingsPage from './Settings';
+import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 import { 
   Bell, User, 
   LayoutDashboard, Video, Settings, LogOut,
-  Accessibility, Users
+  Accessibility, Users, Hand
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
@@ -43,6 +47,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
+            data-testid={`nav-${item.id}`}
             className={`w-full flex items-center p-3 rounded-xl transition-all ${
               activeTab === item.id 
                 ? 'bg-primary text-white shadow-lg shadow-blue-500/20' 
@@ -97,22 +102,40 @@ const DashboardContent = ({ onNavigateToSettings }: { onNavigateToSettings: () =
     return <ParentDashboard />;
   }
 
-  // Default User Dashboard
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
-      <div className="lg:col-span-8 flex flex-col gap-6">
-         <div className="bg-white rounded-3xl shadow-soft border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center gap-2">
-               <h2 className="font-display font-bold text-xl text-slate-800">Live Translator</h2>
-               <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wide">Active</span>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="lg:col-span-3 flex flex-col gap-6">
+        <SignDetector />
+        
+        {/* Sign Language Navigation Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <Link 
+            href="/sign-language-guide"
+            className="flex items-center justify-center gap-3 p-6 bg-white rounded-2xl border border-slate-100 hover:border-primary hover:shadow-md transition-all hover-elevate"
+            data-testid="button-asl-guide"
+          >
+            <Hand size={24} className="text-primary" />
+            <div className="text-left">
+              <p className="font-bold text-slate-800">ASL Guide</p>
+              <p className="text-xs text-slate-500">American Sign Language</p>
             </div>
-            <div className="flex-1 p-1">
-               <SignDetector />
+          </Link>
+          
+          <Link 
+            href="/bangla-sign-guide"
+            className="flex items-center justify-center gap-3 p-6 bg-white rounded-2xl border border-slate-100 hover:border-primary hover:shadow-md transition-all hover-elevate"
+            data-testid="button-bdsl-guide"
+          >
+            <Hand size={24} className="text-primary" />
+            <div className="text-left">
+              <p className="font-bold text-slate-800">BdSL Guide</p>
+              <p className="text-xs text-slate-500">Bangla Sign Language</p>
             </div>
-         </div>
+          </Link>
+        </div>
       </div>
-
-      <div className="lg:col-span-4 flex flex-col gap-6">
+      
+      <div className="lg:col-span-1 flex flex-col gap-6">
         <EmergencyProfileCard onNavigateToSettings={onNavigateToSettings} />
         <div className="flex-1">
           <TextToSign />
@@ -139,18 +162,16 @@ const MainAppContent = ({ activeTab, setActiveTab }: { activeTab: string, setAct
 
   return (
     <>
-      {/* Voice Command System */}
       <VoiceCommandSystem 
         onNavigate={setActiveTab}
         onEmergency={triggerEmergency}
       />
       
-      {/* Quick Accessibility Toolbar */}
       <QuickAccessibilityToolbar />
       
       <EmergencyOverlay />
       
-      {activeTab === 'app' && <DashboardContent />}
+      {activeTab === 'app' && <DashboardContent onNavigateToSettings={() => setActiveTab('settings')} />}
       
       {activeTab === 'meet' && (
         <div className="h-[calc(100vh-12rem)]">
@@ -176,13 +197,29 @@ const MainAppContent = ({ activeTab, setActiveTab }: { activeTab: string, setAct
       
       {activeTab === 'caregiver' && <CaregiverMode />}
       
-      {activeTab === 'settings' && <AccessibilitySettings />}
+      {activeTab === 'settings' && <SettingsPage />}
     </>
   );
 };
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState('app');
+  const { toast } = useToast();
+
+  // Listen for emergency alerts
+  useEffect(() => {
+    const handleEmergencyAlert = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      toast({
+        title: "🚨 Emergency SOS Activated",
+        description: customEvent.detail.message,
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener('emergencyAlert', handleEmergencyAlert);
+    return () => window.removeEventListener('emergencyAlert', handleEmergencyAlert);
+  }, [toast]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
