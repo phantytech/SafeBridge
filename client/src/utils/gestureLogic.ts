@@ -467,6 +467,41 @@ export const gestureDescriptions: Record<Exclude<DetectedGesture, null>, string>
   "SAD": "Finger tracing tear"
 };
 
+// Bangla translations for BdSL (Bangla Sign Language)
+export const bangladeshGestureNames: Record<Exclude<DetectedGesture, null>, string> = {
+  "HELLO": "নমস্কার",
+  "YES": "হ্যাঁ",
+  "SOS": "জরুরি সাহায্য",
+  "PEACE": "শান্তি",
+  "NO": "না",
+  "THANK YOU": "ধন্যবাদ",
+  "PLEASE": "দয়া করে",
+  "SORRY": "দুঃখিত",
+  "HELP": "সাহায্য",
+  "LOVE": "ভালোবাসা",
+  "GOOD": "ভালো",
+  "BAD": "খারাপ",
+  "STOP": "থামো",
+  "OK": "ঠিক আছে",
+  "CALL": "কল করো",
+  "WAIT": "অপেক্ষা করো",
+  "COME": "আসো",
+  "GO": "যাও",
+  "EAT": "খাও",
+  "DRINK": "পানীয়",
+  "SLEEP": "ঘুম",
+  "HAPPY": "খুশি",
+  "SAD": "দুঃখ"
+};
+
+// Get gesture name in the specified language
+export const getGestureName = (gesture: Exclude<DetectedGesture, null>, language: 'EN' | 'BN' = 'EN'): string => {
+  if (language === 'BN') {
+    return bangladeshGestureNames[gesture] || gesture;
+  }
+  return gesture;
+};
+
 // Get all available gestures
 export const getAllGestures = (): Exclude<DetectedGesture, null>[] => {
   return [

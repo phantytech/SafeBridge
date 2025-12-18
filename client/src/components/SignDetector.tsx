@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { FilesetResolver, HandLandmarker, DrawingUtils, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { Camera, RefreshCw, Video, VideoOff, BookOpen } from 'lucide-react';
-import { detectGesture, DetectedGesture } from '../utils/gestureLogic';
+import { detectGesture, DetectedGesture, getGestureName } from '../utils/gestureLogic';
 import { useEmergency } from '../context/EmergencyContext';
 import { motion } from 'framer-motion';
 import { Link } from 'wouter';
@@ -224,7 +224,7 @@ const SignDetector: React.FC = () => {
                     key={gesture}
                     className="text-4xl font-display font-bold text-slate-800"
                   >
-                    {gesture}
+                    {detectionMode === 'BdSL' ? getGestureName(gesture, 'BN') : gesture}
                   </motion.h2>
                 ) : (
                   <span className="text-2xl text-slate-300 font-display font-medium">Waiting for sign...</span>
