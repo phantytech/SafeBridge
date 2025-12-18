@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Share2, Captions, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, ArrowLeft, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'wouter';
 import { apiRequest } from '../lib/queryClient';
@@ -11,24 +11,273 @@ interface SafeMeetProps {
   meetCode?: string;
 }
 
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ]
+};
+
 const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
   const [isMicOn, setIsMicOn] = useState(false);
   const [isCamOn, setIsCamOn] = useState(true);
   const [meetCode, setMeetCode] = useState<string | null>(initialMeetCode || null);
+  const [inputCode, setInputCode] = useState('');
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [copied, setCopied] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isFull, setIsFull] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...');
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [peerConnected, setPeerConnected] = useState(false);
+  
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  
+  const wsRef = useRef<WebSocket | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remotePeerIdRef = useRef<string | null>(null);
+
+  // Initialize local media stream
+  const initLocalStream = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      setLocalStream(stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      // Start with mic muted
+      stream.getAudioTracks().forEach(track => track.enabled = false);
+      return stream;
+    } catch (err) {
+      console.error('Failed to get local stream:', err);
+      setError('Camera/microphone access denied. Please allow access.');
+      return null;
+    }
+  }, []);
+
+  // Create peer connection
+  const createPeerConnection = useCallback((stream: MediaStream) => {
+    const pc = new RTCPeerConnection(ICE_SERVERS);
+    
+    // Add local tracks to peer connection
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
+
+    // Handle incoming tracks (remote stream)
+    pc.ontrack = (event) => {
+      console.log('Received remote track:', event.track.kind);
+      if (event.streams && event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        }
+        setPeerConnected(true);
+        setConnectionStatus('Connected');
+      }
+    };
+
+    // Handle ICE candidates
+    pc.onicecandidate = (event) => {
+      if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN && remotePeerIdRef.current) {
+        wsRef.current.send(JSON.stringify({
+          type: 'ice-candidate',
+          targetUserId: remotePeerIdRef.current,
+          candidate: event.candidate
+        }));
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('Connection state:', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        setConnectionStatus('Connected');
+        setPeerConnected(true);
+      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        setConnectionStatus('Disconnected');
+        setPeerConnected(false);
+      }
+    };
+
+    peerConnectionRef.current = pc;
+    return pc;
+  }, []);
+
+  // Handle creating an offer (initiator)
+  const createOffer = useCallback(async (targetUserId: string) => {
+    if (!peerConnectionRef.current) return;
+    remotePeerIdRef.current = targetUserId;
+    
+    try {
+      const offer = await peerConnectionRef.current.createOffer();
+      await peerConnectionRef.current.setLocalDescription(offer);
+      
+      wsRef.current?.send(JSON.stringify({
+        type: 'offer',
+        targetUserId,
+        sdp: offer
+      }));
+    } catch (err) {
+      console.error('Failed to create offer:', err);
+    }
+  }, []);
+
+  // Handle receiving an offer
+  const handleOffer = useCallback(async (fromUserId: string, sdp: RTCSessionDescriptionInit) => {
+    if (!peerConnectionRef.current) return;
+    remotePeerIdRef.current = fromUserId;
+    
+    try {
+      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await peerConnectionRef.current.createAnswer();
+      await peerConnectionRef.current.setLocalDescription(answer);
+      
+      wsRef.current?.send(JSON.stringify({
+        type: 'answer',
+        targetUserId: fromUserId,
+        sdp: answer
+      }));
+    } catch (err) {
+      console.error('Failed to handle offer:', err);
+    }
+  }, []);
+
+  // Handle receiving an answer
+  const handleAnswer = useCallback(async (sdp: RTCSessionDescriptionInit) => {
+    if (!peerConnectionRef.current) return;
+    
+    try {
+      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(sdp));
+    } catch (err) {
+      console.error('Failed to handle answer:', err);
+    }
+  }, []);
+
+  // Handle ICE candidate
+  const handleIceCandidate = useCallback(async (candidate: RTCIceCandidateInit) => {
+    if (!peerConnectionRef.current) return;
+    
+    try {
+      await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (err) {
+      console.error('Failed to add ICE candidate:', err);
+    }
+  }, []);
+
+  // Connect to signaling server
+  const connectSignaling = useCallback(async (code: string) => {
+    if (!user) return;
+    
+    const stream = await initLocalStream();
+    if (!stream) return;
+    
+    createPeerConnection(stream);
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/signaling`);
+    wsRef.current = ws;
+    
+    ws.onopen = () => {
+      console.log('Signaling connected');
+      setConnectionStatus('Waiting for peer...');
+      ws.send(JSON.stringify({
+        type: 'join',
+        meetCode: code,
+        userId: user.id
+      }));
+    };
+    
+    ws.onmessage = async (event) => {
+      const message = JSON.parse(event.data);
+      
+      switch (message.type) {
+        case 'joined':
+          console.log('Joined room:', message.meetCode, 'Existing peers:', message.existingPeers);
+          // If there are existing peers, create offer to connect
+          if (message.existingPeers && message.existingPeers.length > 0) {
+            await createOffer(message.existingPeers[0]);
+          }
+          break;
+          
+        case 'user-joined':
+          console.log('User joined:', message.userId);
+          setConnectionStatus('Peer joined, connecting...');
+          // New user joined, they will send us an offer
+          remotePeerIdRef.current = message.userId;
+          break;
+          
+        case 'offer':
+          console.log('Received offer from:', message.fromUserId);
+          await handleOffer(message.fromUserId, message.sdp);
+          break;
+          
+        case 'answer':
+          console.log('Received answer');
+          await handleAnswer(message.sdp);
+          break;
+          
+        case 'ice-candidate':
+          await handleIceCandidate(message.candidate);
+          break;
+          
+        case 'user-left':
+          console.log('User left:', message.userId);
+          setPeerConnected(false);
+          setRemoteStream(null);
+          setConnectionStatus('Peer disconnected');
+          remotePeerIdRef.current = null;
+          break;
+          
+        case 'error':
+          setError(message.message);
+          break;
+      }
+    };
+    
+    ws.onerror = (err) => {
+      console.error('WebSocket error:', err);
+      setConnectionStatus('Connection error');
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket closed');
+      setConnectionStatus('Disconnected');
+    };
+  }, [user, initLocalStream, createPeerConnection, createOffer, handleOffer, handleAnswer, handleIceCandidate]);
 
   // Load existing meet if meetCode provided
   useEffect(() => {
-    if (initialMeetCode && !meeting) {
+    if (initialMeetCode && !meeting && user) {
       loadMeet(initialMeetCode);
     }
-  }, [initialMeetCode]);
+  }, [initialMeetCode, user]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'leave' }));
+          wsRef.current.close();
+        }
+      } catch (err) {
+        console.warn('WebSocket cleanup error:', err);
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [localStream]);
 
   const loadMeet = async (code: string) => {
     try {
@@ -36,17 +285,17 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       const data = await res.json();
       if (data.error) {
         setError('Meet not found');
-        console.error('Meet not found');
         return;
       }
       setMeeting(data);
-      // Check if already at capacity
-      if (data.participants && data.participants.length >= 1) {
-        setIsFull(true);
-      }
+      setMeetCode(code);
+      
+      // Connect to signaling server
+      await connectSignaling(code);
+      
       // Auto-join if not the creator
       if (user && data.createdByUserId !== user.id) {
-        await joinMeet(code);
+        await joinMeetApi(code);
       }
     } catch (error) {
       setError('Failed to load meet');
@@ -64,25 +313,26 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       const data = await res.json();
       setMeetCode(data.meetCode);
       setMeeting(data);
-      // Navigate to meet URL
+      
+      // Connect to signaling server
+      await connectSignaling(data.meetCode);
+      
       navigate(`/meet/${data.meetCode}`);
     } catch (error) {
       console.error('Failed to create meet:', error);
     }
   };
 
-  const joinMeet = async (code?: string) => {
-    if (!user || !meetCode && !code) return;
-    const codeToUse = code || meetCode;
+  const joinMeetApi = async (code: string) => {
+    if (!user) return;
     try {
-      const res = await apiRequest('POST', `/api/meets/${codeToUse}/join`, {
+      const res = await apiRequest('POST', `/api/meets/${code}/join`, {
         userId: user.id,
         userName: user.name
       });
       if (!res.ok) {
         const data = await res.json();
         if (res.status === 409) {
-          setIsFull(true);
           setError('This meeting is full. Only 1 participant can join per meeting.');
           return;
         }
@@ -91,28 +341,68 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       }
       const data = await res.json();
       setMeeting(data);
-      setMeetCode(codeToUse);
       setError(null);
-      setIsFull(data.participants && data.participants.length >= 1);
-      // Navigate to meet URL if not already there
-      if (!initialMeetCode) {
-        navigate(`/meet/${codeToUse}`);
-      }
     } catch (error) {
       setError('Failed to join meet');
       console.error('Failed to join meet:', error);
     }
   };
 
+  const handleJoinMeet = async () => {
+    if (!inputCode) return;
+    setMeetCode(inputCode.toLowerCase());
+    await loadMeet(inputCode.toLowerCase());
+    navigate(`/meet/${inputCode.toLowerCase()}`);
+  };
+
   const endMeet = async () => {
-    if (!meeting) return;
+    // Cleanup WebRTC
     try {
-      await apiRequest('PATCH', `/api/meets/${meeting.id}/end`);
-      setMeetCode(null);
-      setMeeting(null);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Failed to end meet:', error);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'leave' }));
+        wsRef.current.close();
+      }
+    } catch (err) {
+      console.warn('WebSocket cleanup error:', err);
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+    }
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+    
+    if (meeting) {
+      try {
+        await apiRequest('PATCH', `/api/meets/${meeting.id}/end`);
+      } catch (error) {
+        console.error('Failed to end meet:', error);
+      }
+    }
+    
+    setMeetCode(null);
+    setMeeting(null);
+    setRemoteStream(null);
+    setLocalStream(null);
+    setPeerConnected(false);
+    navigate('/dashboard');
+  };
+
+  const toggleMic = () => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsMicOn(!isMicOn);
+    }
+  };
+
+  const toggleCamera = () => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsCamOn(!isCamOn);
     }
   };
 
@@ -151,18 +441,17 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
               <input
                 type="text"
                 placeholder="Enter meet code..."
-                value={meetCode || ''}
-                onChange={(e) => setMeetCode(e.target.value.toLowerCase())}
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value.toLowerCase())}
                 className="flex-1 px-4 py-2 rounded-lg border border-slate-600 bg-slate-800 text-white placeholder-slate-500"
                 data-testid="input-meet-code"
               />
               <button
-                onClick={() => joinMeet()}
-                disabled={isFull}
-                className={`${isFull ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white font-bold py-2 px-4 rounded-lg transition-colors`}
+                onClick={handleJoinMeet}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                 data-testid="button-join-meet"
               >
-                {isFull ? 'Full' : 'Join'}
+                Join
               </button>
             </div>
           </div>
@@ -175,10 +464,17 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
     <div className="h-full bg-slate-900 rounded-3xl overflow-hidden flex flex-col relative">
       {/* Video Grid */}
       <div className="flex-1 relative p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900">
-        {/* User Video */}
+        {/* Local Video */}
         <div className="relative bg-slate-800 rounded-2xl overflow-hidden border border-slate-700">
-          {isCamOn ? (
-            <Webcam className="w-full h-full object-cover" mirrored={true} />
+          {localStream && isCamOn ? (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <div className="w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
@@ -187,22 +483,35 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
             </div>
           )}
           <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-lg text-white text-sm font-medium">
-            You (Sign Language)
+            You {isMicOn ? '' : '(muted)'}
           </div>
         </div>
 
-        {/* Remote Video Placeholder */}
+        {/* Remote Video */}
         <div className="relative bg-slate-800 rounded-2xl overflow-hidden border border-slate-700">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-purple-500 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                {meeting?.participants?.[0]?.name.charAt(0).toUpperCase() || '?'}
+          {peerConnected && remoteStream ? (
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 rounded-full bg-purple-500 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+                  ?
+                </div>
+                <p className="text-white text-sm">{connectionStatus}</p>
+                <p className="text-slate-400 text-xs mt-2">Share the link to invite someone</p>
               </div>
-              <p className="text-white text-sm">
-                {meeting?.participants?.[0]?.name || 'Waiting for participants...'}
-              </p>
             </div>
-          </div>
+          )}
+          {peerConnected && (
+            <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-lg text-white text-sm font-medium">
+              Remote User
+            </div>
+          )}
         </div>
       </div>
 
@@ -230,7 +539,7 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsMicOn(!isMicOn)}
+            onClick={toggleMic}
             className={`p-4 rounded-full transition-colors ${isMicOn ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-red-500 text-white hover:bg-red-600'}`}
             data-testid="button-toggle-mic"
           >
@@ -238,7 +547,7 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
           </button>
 
           <button
-            onClick={() => setIsCamOn(!isCamOn)}
+            onClick={toggleCamera}
             className={`p-4 rounded-full transition-colors ${isCamOn ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-red-500 text-white hover:bg-red-600'}`}
             data-testid="button-toggle-video"
           >
@@ -250,7 +559,7 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
             className="p-4 rounded-full bg-slate-700 text-white hover:bg-slate-600 transition-colors"
             data-testid="button-participants"
           >
-            <span className="text-sm font-bold">{(meeting?.participants?.length || 0) + 1}</span>
+            <Users size={20} />
           </button>
 
           <button
@@ -262,7 +571,11 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
           </button>
         </div>
 
-        <div className="w-32"></div>
+        <div className="w-32 text-right">
+          <span className={`text-xs ${peerConnected ? 'text-green-400' : 'text-slate-400'}`}>
+            {connectionStatus}
+          </span>
+        </div>
       </div>
 
       {/* Participants Panel */}
@@ -272,18 +585,18 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
           animate={{ x: 0 }}
           className="absolute right-0 top-0 bottom-0 w-64 bg-slate-800 border-l border-slate-700 p-4 overflow-y-auto"
         >
-          <h3 className="text-white font-bold mb-4">Participants ({(meeting?.participants?.length || 0) + 1})</h3>
+          <h3 className="text-white font-bold mb-4">Participants ({peerConnected ? 2 : 1})</h3>
           <div className="space-y-2">
             <div className="p-3 bg-slate-700 rounded-lg text-white text-sm">
               <p className="font-bold">{user?.name}</p>
               <p className="text-xs text-slate-400">You</p>
             </div>
-            {meeting?.participants?.map((p, i) => (
-              <div key={i} className="p-3 bg-slate-700 rounded-lg text-white text-sm">
-                <p className="font-bold">{p.name}</p>
-                <p className="text-xs text-slate-400">Joined {new Date(p.joinedAt).toLocaleTimeString()}</p>
+            {peerConnected && (
+              <div className="p-3 bg-slate-700 rounded-lg text-white text-sm">
+                <p className="font-bold">Remote User</p>
+                <p className="text-xs text-green-400">Connected</p>
               </div>
-            ))}
+            )}
           </div>
         </motion.div>
       )}

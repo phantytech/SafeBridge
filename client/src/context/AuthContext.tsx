@@ -79,7 +79,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         role: profile.role
       });
       
-      setLocation('/dashboard');
+      // Redirect to saved URL or dashboard
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      localStorage.removeItem('redirectAfterLogin');
+      setLocation(redirectUrl || '/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -112,7 +115,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         role: profile.role
       });
       
-      setLocation('/dashboard');
+      // Redirect to saved URL or dashboard
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      localStorage.removeItem('redirectAfterLogin');
+      setLocation(redirectUrl || '/dashboard');
     } catch (error) {
       console.error('Signup error:', error);
       throw error;

@@ -1,9 +1,134 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertProfileSchema, insertActivitySchema, settingsSchema, insertEmergencyAlertSchema } from "@shared/schema";
 import { z } from "zod";
 import { supabase } from "./supabase";
+
+// WebRTC Signaling - rooms store connected peers by meet code
+const rooms = new Map<string, Map<string, WebSocket>>();
+
+function setupWebSocketSignaling(httpServer: Server) {
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Handle upgrade requests only for our signaling path
+  httpServer.on('upgrade', (request, socket, head) => {
+    const pathname = request.url;
+    
+    if (pathname === '/ws/signaling') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+    // Let other upgrade requests (like Vite HMR) pass through
+  });
+
+  wss.on('connection', (ws) => {
+    let currentRoom: string | null = null;
+    let currentUserId: string | null = null;
+
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        switch (message.type) {
+          case 'join': {
+            const { meetCode, userId } = message;
+            currentRoom = meetCode;
+            currentUserId = userId;
+            
+            if (!rooms.has(meetCode)) {
+              rooms.set(meetCode, new Map());
+            }
+            
+            const room = rooms.get(meetCode)!;
+            
+            // Check if room is full (max 2 participants)
+            if (room.size >= 2 && !room.has(userId)) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+              return;
+            }
+            
+            // Notify existing peers about new user
+            room.forEach((peerWs, peerId) => {
+              if (peerId !== userId && peerWs.readyState === WebSocket.OPEN) {
+                peerWs.send(JSON.stringify({ type: 'user-joined', userId }));
+              }
+            });
+            
+            // Get existing peer IDs for the new user
+            const existingPeers = Array.from(room.keys()).filter(id => id !== userId);
+            
+            room.set(userId, ws);
+            
+            ws.send(JSON.stringify({ 
+              type: 'joined', 
+              meetCode, 
+              existingPeers,
+              isInitiator: existingPeers.length > 0 
+            }));
+            break;
+          }
+          
+          case 'offer':
+          case 'answer':
+          case 'ice-candidate': {
+            const { targetUserId, ...payload } = message;
+            if (currentRoom && rooms.has(currentRoom)) {
+              const room = rooms.get(currentRoom)!;
+              const targetWs = room.get(targetUserId);
+              if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                targetWs.send(JSON.stringify({ ...payload, fromUserId: currentUserId }));
+              }
+            }
+            break;
+          }
+          
+          case 'leave': {
+            if (currentRoom && currentUserId && rooms.has(currentRoom)) {
+              const room = rooms.get(currentRoom)!;
+              room.delete(currentUserId);
+              
+              // Notify other peers
+              room.forEach((peerWs) => {
+                if (peerWs.readyState === WebSocket.OPEN) {
+                  peerWs.send(JSON.stringify({ type: 'user-left', userId: currentUserId }));
+                }
+              });
+              
+              if (room.size === 0) {
+                rooms.delete(currentRoom);
+              }
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      if (currentRoom && currentUserId && rooms.has(currentRoom)) {
+        const room = rooms.get(currentRoom)!;
+        room.delete(currentUserId);
+        
+        room.forEach((peerWs) => {
+          if (peerWs.readyState === WebSocket.OPEN) {
+            peerWs.send(JSON.stringify({ type: 'user-left', userId: currentUserId }));
+          }
+        });
+        
+        if (room.size === 0) {
+          rooms.delete(currentRoom);
+        }
+      }
+    });
+  });
+
+  console.log('WebSocket signaling server initialized');
+}
 
 // Demo accounts for testing
 const DEMO_ACCOUNTS: Record<string, { password: string; role: string; id: string }> = {
@@ -16,6 +141,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Initialize WebSocket signaling for WebRTC
+  setupWebSocketSignaling(httpServer);
+
   // Auth routes
   app.post("/api/auth/profile", async (req, res) => {
     try {

@@ -16,6 +16,11 @@ const ProtectedRoute = ({ component: Component }: { component: React.ComponentTy
   const { user } = useAuth();
   
   if (!user) {
+    // Store the current URL so we can redirect back after login
+    const currentPath = window.location.pathname;
+    if (currentPath !== '/auth' && currentPath !== '/dashboard') {
+      localStorage.setItem('redirectAfterLogin', currentPath);
+    }
     return <AuthPage />;
   }
   
