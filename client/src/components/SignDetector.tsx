@@ -18,8 +18,9 @@ const SignDetector: React.FC = () => {
   
   const { triggerEmergency } = useEmergency();
   
-  const sosCounterRef = useRef(0);
+  const gestureHoldTimeRef = useRef(0);
   const lastGestureRef = useRef<DetectedGesture>(null);
+  const emergencyTriggeredRef = useRef(false);
 
   useEffect(() => {
     const loadHandLandmarker = async () => {
@@ -84,23 +85,33 @@ const SignDetector: React.FC = () => {
         const currentGesture = detectGesture(landmarks, detectionMode);
         setGesture(currentGesture);
         
-        if (currentGesture === "SOS") {
-          sosCounterRef.current += 1;
-          if (sosCounterRef.current > 60) {
-            triggerEmergency();
-            sosCounterRef.current = 0;
+        // Check if gesture is SOS or HELP and auto-trigger alert if held for 5 seconds
+        if (currentGesture === "SOS" || currentGesture === "HELP") {
+          if (currentGesture === lastGestureRef.current) {
+            // Same gesture continues, increment hold time
+            gestureHoldTimeRef.current += 1;
+            
+            // 5 seconds at ~30 FPS = ~150 frames
+            if (gestureHoldTimeRef.current > 150 && !emergencyTriggeredRef.current) {
+              triggerEmergency();
+              emergencyTriggeredRef.current = true;
+            }
+          } else {
+            // New gesture started, reset counter
+            gestureHoldTimeRef.current = 1;
+            emergencyTriggeredRef.current = false;
           }
         } else {
-           // SOS logic: Reset counter if we see a different gesture
-           if (currentGesture !== lastGestureRef.current) {
-               sosCounterRef.current = Math.max(0, sosCounterRef.current - 5);
-           }
+          // Different gesture detected, reset the hold time
+          gestureHoldTimeRef.current = 0;
+          emergencyTriggeredRef.current = false;
         }
         lastGestureRef.current = currentGesture;
       }
     } else {
         setGesture(null);
-        sosCounterRef.current = 0;
+        gestureHoldTimeRef.current = 0;
+        emergencyTriggeredRef.current = false;
     }
 
     if (webcamRunning) {
