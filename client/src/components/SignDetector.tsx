@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { FilesetResolver, HandLandmarker, DrawingUtils, NormalizedLandmark } from '@mediapipe/tasks-vision';
-import { Camera, RefreshCw, Video, VideoOff, BookOpen } from 'lucide-react';
+import { Camera, RefreshCw, Video, VideoOff, BookOpen, AlertTriangle } from 'lucide-react';
 import { detectGesture, DetectedGesture, getGestureName } from '../utils/gestureLogic';
 import { useEmergency } from '../context/EmergencyContext';
 import { motion } from 'framer-motion';
@@ -15,12 +15,14 @@ const SignDetector: React.FC = () => {
   const [gesture, setGesture] = useState<DetectedGesture>(null);
   const [loading, setLoading] = useState(true);
   const [detectionMode, setDetectionMode] = useState<'ASL' | 'BdSL'>('ASL');
+  const [holdProgress, setHoldProgress] = useState(0);
   
   const { triggerEmergency } = useEmergency();
   
   const gestureHoldTimeRef = useRef(0);
   const lastGestureRef = useRef<DetectedGesture>(null);
   const emergencyTriggeredRef = useRef(false);
+  const HOLD_THRESHOLD = 150; // 5 seconds at ~30 FPS
 
   useEffect(() => {
     const loadHandLandmarker = async () => {
@@ -90,9 +92,14 @@ const SignDetector: React.FC = () => {
           if (currentGesture === lastGestureRef.current) {
             // Same gesture continues, increment hold time
             gestureHoldTimeRef.current += 1;
+            const progress = Math.min((gestureHoldTimeRef.current / HOLD_THRESHOLD) * 100, 100);
+            setHoldProgress(progress);
             
-            // 5 seconds at ~30 FPS = ~150 frames
-            if (gestureHoldTimeRef.current > 150 && !emergencyTriggeredRef.current) {
+            console.log(`⏱️ Hold time: ${gestureHoldTimeRef.current}/${HOLD_THRESHOLD} (${currentGesture})`);
+            
+            // Trigger emergency when threshold reached
+            if (gestureHoldTimeRef.current > HOLD_THRESHOLD && !emergencyTriggeredRef.current) {
+              console.log('🚨 EMERGENCY THRESHOLD REACHED - TRIGGERING NOW');
               triggerEmergency();
               emergencyTriggeredRef.current = true;
             }
@@ -100,11 +107,13 @@ const SignDetector: React.FC = () => {
             // New gesture started, reset counter
             gestureHoldTimeRef.current = 1;
             emergencyTriggeredRef.current = false;
+            setHoldProgress(0);
           }
         } else {
           // Different gesture detected, reset the hold time
           gestureHoldTimeRef.current = 0;
           emergencyTriggeredRef.current = false;
+          setHoldProgress(0);
         }
         lastGestureRef.current = currentGesture;
       }
@@ -112,6 +121,7 @@ const SignDetector: React.FC = () => {
         setGesture(null);
         gestureHoldTimeRef.current = 0;
         emergencyTriggeredRef.current = false;
+        setHoldProgress(0);
     }
 
     if (webcamRunning) {
@@ -227,16 +237,34 @@ const SignDetector: React.FC = () => {
              </div>
            </div>
            <div className="flex items-center justify-between">
-             <div className="h-12 flex items-center">
+             <div className="h-12 flex items-center gap-4">
                 {gesture ? (
-                  <motion.h2 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    key={gesture}
-                    className="text-4xl font-display font-bold text-slate-800"
-                  >
-                    {detectionMode === 'BdSL' ? getGestureName(gesture, 'BN') : gesture}
-                  </motion.h2>
+                  <>
+                    <motion.h2 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      key={gesture}
+                      className={`text-4xl font-display font-bold ${
+                        gesture === 'SOS' || gesture === 'HELP' 
+                          ? 'text-red-600 animate-pulse' 
+                          : 'text-slate-800'
+                      }`}
+                    >
+                      {detectionMode === 'BdSL' ? getGestureName(gesture, 'BN') : gesture}
+                    </motion.h2>
+                    {(gesture === 'SOS' || gesture === 'HELP') && holdProgress > 0 && (
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle size={20} className="text-red-600 animate-bounce" />
+                        <div className="w-24 h-2 bg-red-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-red-600 transition-all duration-100"
+                            style={{ width: `${holdProgress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-red-600 w-8">{Math.ceil(holdProgress / 20)}/5s</span>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <span className="text-2xl text-slate-300 font-display font-medium">Waiting for sign...</span>
                 )}

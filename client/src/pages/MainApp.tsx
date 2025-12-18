@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { useAuth } from '../context/AuthContext';
-import { EmergencyProvider, useEmergency } from '../context/EmergencyContext';
+import { EmergencyProvider, useEmergency, showEmergencyToast } from '../context/EmergencyContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import SignDetector from '../components/SignDetector';
 import TextToSign from '../components/TextToSign';
@@ -15,6 +15,8 @@ import VoiceCommandSystem from '../components/VoiceCommandSystem';
 import QuickAccessibilityToolbar from '../components/QuickAccessibilityToolbar';
 import CaregiverMode from '../components/CaregiverMode';
 import SettingsPage from './Settings';
+import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 import { 
   Bell, User, 
   LayoutDashboard, Video, Settings, LogOut,
@@ -202,6 +204,22 @@ const MainAppContent = ({ activeTab, setActiveTab }: { activeTab: string, setAct
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState('app');
+  const { toast } = useToast();
+
+  // Listen for emergency alerts
+  useEffect(() => {
+    const handleEmergencyAlert = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      toast({
+        title: "🚨 Emergency SOS Activated",
+        description: customEvent.detail.message,
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener('emergencyAlert', handleEmergencyAlert);
+    return () => window.removeEventListener('emergencyAlert', handleEmergencyAlert);
+  }, [toast]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
