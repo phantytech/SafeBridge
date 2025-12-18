@@ -1,6 +1,12 @@
 import { Link } from "wouter";
-import { ArrowLeft, Hand, AlertTriangle, Heart, MessageCircle, HelpCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faHand, faArrowLeft, faTriangleExclamation, faHeart, faComment, faCircleQuestion,
+  faThumbsUp, faThumbsDown, faPhone, faBed, faUtensils, faWineGlass, faFaceSmile, 
+  faFaceFrown, faCircleCheck, faCircleXmark, faCirclePause, faPlay, 
+  faArrowRightToBracket, faArrowRightFromBracket, faEye, faVolumeHigh
+} from '@fortawesome/free-solid-svg-icons';
 import { getAllGestures, gestureDescriptions, DetectedGesture } from "../utils/gestureLogic";
 
 interface GestureCardProps {
@@ -63,16 +69,42 @@ const gestureCategories: Record<Exclude<DetectedGesture, null>, string> = {
   "SAD": "Emotions"
 };
 
-const categoryIcons: Record<string, typeof Hand> = {
-  "Greetings": Hand,
-  "Responses": MessageCircle,
-  "Emergency": AlertTriangle,
-  "Expressions": Heart,
-  "Courtesy": Heart,
-  "Emotions": Heart,
-  "Commands": Hand,
-  "Actions": Hand,
-  "Daily Activities": Hand
+const gestureIcons: Record<Exclude<DetectedGesture, null>, any> = {
+  "HELLO": faHand,
+  "YES": faThumbsUp,
+  "SOS": faTriangleExclamation,
+  "PEACE": faHand,
+  "NO": faCircleXmark,
+  "THANK YOU": faHeart,
+  "PLEASE": faHand,
+  "SORRY": faHand,
+  "HELP": faCircleQuestion,
+  "LOVE": faHeart,
+  "GOOD": faThumbsUp,
+  "BAD": faThumbsDown,
+  "STOP": faCirclePause,
+  "OK": faCircleCheck,
+  "CALL": faPhone,
+  "WAIT": faEye,
+  "COME": faArrowRightToBracket,
+  "GO": faArrowRightFromBracket,
+  "EAT": faUtensils,
+  "DRINK": faWineGlass,
+  "SLEEP": faBed,
+  "HAPPY": faFaceSmile,
+  "SAD": faFaceFrown
+};
+
+const categoryIcons: Record<string, any> = {
+  "Greetings": faHand,
+  "Responses": faComment,
+  "Emergency": faTriangleExclamation,
+  "Expressions": faHeart,
+  "Courtesy": faHeart,
+  "Emotions": faHeart,
+  "Commands": faHand,
+  "Actions": faHand,
+  "Daily Activities": faUtensils
 };
 
 const categoryColors: Record<string, string> = {
@@ -89,6 +121,7 @@ const categoryColors: Record<string, string> = {
 
 const GestureCard = ({ gesture, description, instructions, category, isEmergency }: GestureCardProps) => {
   const colorClass = categoryColors[category] || "bg-gray-100 text-gray-600 border-gray-200";
+  const gestureIcon = gestureIcons[gesture] || faHand;
   
   return (
     <motion.div
@@ -98,27 +131,39 @@ const GestureCard = ({ gesture, description, instructions, category, isEmergency
       className={`bg-white rounded-2xl p-6 shadow-sm border ${isEmergency ? 'border-red-200 ring-2 ring-red-100' : 'border-gray-100'}`}
     >
       <div className="flex items-start justify-between mb-4">
-        <div>
-          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${colorClass} mb-2`}>
-            {category}
-          </span>
-          <h3 className={`text-xl font-bold ${isEmergency ? 'text-red-600' : 'text-slate-800'}`}>
-            {gesture}
-          </h3>
+        <div className="flex items-start gap-3 flex-1">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass.split(' ')[0]} ${isEmergency ? 'bg-red-100' : ''}`}>
+            <FontAwesomeIcon 
+              icon={gestureIcon} 
+              className={`${isEmergency ? 'text-red-600' : colorClass.split(' ')[1]}`}
+              style={{ fontSize: '1.25rem' }}
+            />
+          </div>
+          <div>
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${colorClass} mb-2`}>
+              {category}
+            </span>
+            <h3 className={`text-xl font-bold ${isEmergency ? 'text-red-600' : 'text-slate-800'}`}>
+              {gesture}
+            </h3>
+          </div>
         </div>
         {isEmergency && (
-          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
+          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <FontAwesomeIcon icon={faTriangleExclamation} className="text-red-600" style={{ fontSize: '1.25rem' }} />
           </div>
         )}
       </div>
       
       <p className="text-slate-600 text-sm mb-3">{description}</p>
       
-      <div className="bg-slate-50 rounded-xl p-4">
-        <div className="flex items-start gap-2">
-          <HelpCircle className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-          <p className="text-slate-700 text-sm leading-relaxed">{instructions}</p>
+      <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+        <div className="flex items-start gap-3">
+          <div className="flex flex-col items-center gap-1 flex-shrink-0">
+            <FontAwesomeIcon icon={faHand} className="text-slate-400" style={{ fontSize: '1.5rem' }} />
+            <span className="text-xs text-slate-400">How</span>
+          </div>
+          <p className="text-slate-700 text-sm leading-relaxed pt-1">{instructions}</p>
         </div>
       </div>
     </motion.div>
@@ -145,7 +190,7 @@ const SignLanguageGuide = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors" data-testid="link-back-home">
-              <ArrowLeft size={20} />
+              <FontAwesomeIcon icon={faArrowLeft} />
               <span className="font-medium">Back to Home</span>
             </Link>
             <Link href="/dashboard" className="bg-primary text-white px-5 py-2.5 rounded-full font-semibold text-sm hover:bg-blue-600 transition-colors" data-testid="link-start-translating">
@@ -162,7 +207,7 @@ const SignLanguageGuide = () => {
           className="text-center mb-12"
         >
           <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-medium mb-6">
-            <Hand size={16} />
+            <FontAwesomeIcon icon={faHand} />
             <span>Sign Language Reference Guide</span>
           </div>
           <h1 className="font-display text-4xl md:text-5xl font-bold text-slate-900 mb-4">
@@ -177,7 +222,7 @@ const SignLanguageGuide = () => {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-12">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+              <FontAwesomeIcon icon={faTriangleExclamation} className="text-red-600" style={{ fontSize: '1.5rem' }} />
             </div>
             <div>
               <h2 className="text-lg font-bold text-red-800 mb-2">Emergency SOS Feature</h2>
@@ -195,13 +240,17 @@ const SignLanguageGuide = () => {
             const gestures = groupedGestures[category];
             if (!gestures) return null;
             
-            const IconComponent = categoryIcons[category] || Hand;
+            const IconComponent = categoryIcons[category] || faHand;
             
             return (
               <section key={category}>
                 <div className="flex items-center gap-3 mb-6">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${categoryColors[category]?.split(' ')[0] || 'bg-gray-100'}`}>
-                    <IconComponent className={`w-5 h-5 ${categoryColors[category]?.split(' ')[1] || 'text-gray-600'}`} />
+                    <FontAwesomeIcon 
+                      icon={IconComponent} 
+                      className={categoryColors[category]?.split(' ')[1] || 'text-gray-600'}
+                      style={{ fontSize: '1.25rem' }}
+                    />
                   </div>
                   <h2 className="text-2xl font-bold text-slate-800">{category}</h2>
                   <span className="text-slate-400 text-sm">({gestures.length} signs)</span>

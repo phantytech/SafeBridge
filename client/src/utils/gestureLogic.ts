@@ -56,15 +56,17 @@ export const detectGesture = (landmarks: NormalizedLandmark[]): DetectedGesture 
   const pinkyDIP = landmarks[19];
   const pinkyPIP = landmarks[18];
   const pinkyMCP = landmarks[17];
+  
+  const palmCenter = landmarks[9]; // Middle MCP as palm reference
 
-  // Helper to check if finger is extended
+  // Helper to check if finger is extended with stricter threshold
   const isExtended = (tip: NormalizedLandmark, pip: NormalizedLandmark) => {
-    return getDistance(wrist, tip) > getDistance(wrist, pip);
+    return getDistance(wrist, tip) > getDistance(wrist, pip) * 1.1;
   };
 
-  // Check if finger is curled (tip closer to palm than PIP)
-  const isCurled = (tip: NormalizedLandmark, pip: NormalizedLandmark, mcp: NormalizedLandmark) => {
-    return getDistance(wrist, tip) < getDistance(wrist, pip) * 0.9;
+  // Check if finger is strongly curled
+  const isCurled = (tip: NormalizedLandmark, pip: NormalizedLandmark) => {
+    return getDistance(wrist, tip) < getDistance(wrist, pip) * 0.85;
   };
 
   const thumbExtended = isExtended(thumbTip, thumbIP);
@@ -73,29 +75,30 @@ export const detectGesture = (landmarks: NormalizedLandmark[]): DetectedGesture 
   const ringExtended = isExtended(ringTip, ringPIP);
   const pinkyExtended = isExtended(pinkyTip, pinkyPIP);
 
-  const indexCurled = isCurled(indexTip, indexPIP, indexMCP);
-  const middleCurled = isCurled(middleTip, middlePIP, middleMCP);
-  const ringCurled = isCurled(ringTip, ringPIP, ringMCP);
-  const pinkyCurled = isCurled(pinkyTip, pinkyPIP, pinkyMCP);
+  const indexCurled = isCurled(indexTip, indexPIP);
+  const middleCurled = isCurled(middleTip, middlePIP);
+  const ringCurled = isCurled(ringTip, ringPIP);
+  const pinkyCurled = isCurled(pinkyTip, pinkyPIP);
+  const thumbCurled = isCurled(thumbTip, thumbIP);
 
   // Count extended fingers
   const extendedCount = [thumbExtended, indexExtended, middleExtended, ringExtended, pinkyExtended].filter(Boolean).length;
 
-  // GESTURE DETECTION RULES (23 gestures total)
+  // GESTURE DETECTION RULES - Ordered by specificity (most specific first)
 
   // 1. SOS (Fist - All fingers folded) - EMERGENCY
-  if (!indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended) {
+  if (indexCurled && middleCurled && ringCurled && pinkyCurled && thumbCurled) {
     return "SOS";
   }
 
-  // 2. HELLO (Open Palm - All extended)
-  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
-    return "HELLO";
+  // 2. OK (Thumb and index form circle, others extended) - CHECK EARLY
+  if (areTouching(thumbTip, indexTip, 0.06) && middleExtended && ringExtended && pinkyExtended) {
+    return "OK";
   }
 
-  // 3. YES (Thumbs Up - thumb extended, others folded)
-  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-    return "YES";
+  // 3. LOVE (I Love You sign - thumb, index, and pinky extended, middle+ring folded)
+  if (thumbExtended && indexExtended && middleCurled && ringCurled && pinkyExtended) {
+    return "LOVE";
   }
 
   // 4. PEACE (V sign - Index + Middle extended, others folded)
@@ -103,135 +106,125 @@ export const detectGesture = (landmarks: NormalizedLandmark[]): DetectedGesture 
     return "PEACE";
   }
 
-  // 5. NO (Index finger pointing up, wagging motion simulated by single finger)
-  if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended) {
-    return "NO";
-  }
-
-  // 6. THANK YOU (Flat hand moving from chin - open palm with thumb extended)
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended && thumbExtended) {
-    // This is same as HELLO but we can detect hand position later
-    // For now, differentiate by thumb position relative to palm
-    const thumbAwayFromPalm = getDistance(thumbTip, middleMCP) > 0.15;
-    if (thumbAwayFromPalm) {
-      return "THANK YOU";
-    }
-  }
-
-  // 7. PLEASE (Circular motion on chest - flat hand)
-  // Detected as palm flat with fingers together
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended && !thumbExtended) {
-    return "PLEASE";
-  }
-
-  // 8. SORRY (Fist on chest - closed fist with thumb visible)
-  if (!indexExtended && !middleExtended && !ringExtended && !pinkyExtended && thumbExtended) {
-    // Same as YES but checking if thumb is across palm
-    const thumbAcrossPalm = thumbTip.x > indexMCP.x;
-    if (thumbAcrossPalm) {
-      return "SORRY";
-    }
-  }
-
-  // 9. HELP (Thumbs up on flat palm - one hand gesture)
-  // Detected as thumb up with index slightly extended
-  if (thumbExtended && indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-    return "HELP";
-  }
-
-  // 10. LOVE (I Love You sign - thumb, index, and pinky extended)
-  if (thumbExtended && indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
-    return "LOVE";
-  }
-
-  // 11. GOOD (Thumbs up - same as YES but checking hand orientation)
-  // Already handled by YES
-
-  // 12. BAD (Thumbs down - thumb extended pointing down)
-  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-    // Check if thumb is pointing down (thumb tip below wrist)
-    if (thumbTip.y > wrist.y) {
-      return "BAD";
-    }
-  }
-
-  // 13. STOP (Palm facing forward, all fingers extended and together)
-  // Same as HELLO but fingers closer together
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended) {
-    const fingersClose = getDistance(indexTip, pinkyTip) < 0.15;
-    if (fingersClose && thumbExtended) {
-      return "STOP";
-    }
-  }
-
-  // 14. OK (Thumb and index form circle, others extended)
-  if (areTouching(thumbTip, indexTip, 0.06) && middleExtended && ringExtended && pinkyExtended) {
-    return "OK";
-  }
-
-  // 15. CALL (Thumb and pinky extended, simulating phone)
+  // 5. CALL (Thumb and pinky extended, others folded)
   if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
-    return "CALL";
-  }
-
-  // 16. WAIT (Open palm facing down or sideways)
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended && thumbExtended) {
-    // Detect palm orientation by checking if fingertips are at similar Y
-    const fingersLevel = Math.abs(indexTip.y - pinkyTip.y) < 0.05;
-    if (fingersLevel) {
-      return "WAIT";
+    // Differentiate from DRINK by position
+    const thumbNotNearFace = thumbTip.y > 0.3;
+    if (thumbNotNearFace) {
+      return "CALL";
     }
   }
 
-  // 17. COME (Index finger curled in beckoning motion)
-  if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-    const indexBent = getDistance(indexTip, indexMCP) < getDistance(indexPIP, indexMCP) * 1.5;
-    if (indexBent) {
-      return "COME";
-    }
-  }
-
-  // 18. GO (Pointing gesture - index extended forward)
-  if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended && thumbExtended) {
-    return "GO";
-  }
-
-  // 19. EAT (Fingers to mouth gesture - fingers bunched together)
-  if (areTouching(thumbTip, indexTip, 0.08) && areTouching(thumbTip, middleTip, 0.1)) {
-    return "EAT";
-  }
-
-  // 20. DRINK (Thumb to mouth, simulating drinking)
+  // 6. DRINK (Thumb to mouth - thumb near face)
   if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && pinkyExtended) {
-    // Similar to CALL but with different hand position
     const thumbNearFace = thumbTip.y < 0.3;
     if (thumbNearFace) {
       return "DRINK";
     }
   }
 
-  // 21. SLEEP (Palm against cheek, tilted head simulation)
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended && !thumbExtended) {
-    const palmTilted = Math.abs(indexTip.x - pinkyTip.x) > 0.1;
-    if (palmTilted) {
-      return "SLEEP";
+  // 7. EAT (Fingers bunched to mouth)
+  if (areTouching(thumbTip, indexTip, 0.08) && areTouching(indexTip, middleTip, 0.08)) {
+    return "EAT";
+  }
+
+  // 8. HELP (Thumb + index extended, rest folded)
+  if (thumbExtended && indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "HELP";
+  }
+
+  // 9. GO (Index + Thumb extended, middle/ring/pinky folded)
+  if (indexExtended && thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "GO";
+  }
+
+  // 10. SORRY (Only thumb extended when all others folded)
+  if (thumbExtended && indexCurled && middleCurled && ringCurled && pinkyCurled) {
+    return "SORRY";
+  }
+
+  // 11. BAD (Thumbs down - thumb extended pointing downward)
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    const thumbPointingDown = thumbTip.y > wrist.y + 0.1;
+    if (thumbPointingDown) {
+      return "BAD";
     }
   }
 
-  // 22. HAPPY (Two hands near face with spread fingers - simplified to spread fingers)
-  if (indexExtended && middleExtended && ringExtended && pinkyExtended && thumbExtended) {
+  // 12. YES/GOOD (Thumbs up - thumb extended pointing upward)
+  if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    const thumbPointingUp = thumbTip.y <= wrist.y;
+    if (thumbPointingUp) {
+      return "YES";
+    }
+  }
+
+  // 13. NO (Only index extended pointing up)
+  if (indexExtended && !thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "NO";
+  }
+
+  // 14. COME (Index finger only)
+  if (indexExtended && !thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    return "COME";
+  }
+
+  // 15. SAD (Index only, pointing downward)
+  if (indexExtended && !thumbExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+    const indexPointingDown = indexTip.y > indexPIP.y + 0.1;
+    if (indexPointingDown) {
+      return "SAD";
+    }
+  }
+
+  // 16. PLEASE (Four fingers extended, no thumb)
+  if (!thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    return "PLEASE";
+  }
+
+  // 17. STOP (All fingers together, spread)
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const fingersClose = getDistance(indexTip, pinkyTip) < 0.12;
+    if (fingersClose) {
+      return "STOP";
+    }
+  }
+
+  // 18. WAIT (All fingers extended, level)
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const fingersLevel = Math.abs(indexTip.y - pinkyTip.y) < 0.05;
+    if (fingersLevel) {
+      return "WAIT";
+    }
+  }
+
+  // 19. HAPPY (All extended, spread wide)
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
     const fingersSpread = getDistance(indexTip, pinkyTip) > 0.2;
     if (fingersSpread) {
       return "HAPPY";
     }
   }
 
-  // 23. SAD (Index finger tracing tear down cheek - single finger pointing down)
-  if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended) {
-    const indexPointingDown = indexTip.y > indexPIP.y;
-    if (indexPointingDown) {
-      return "SAD";
+  // 20. SLEEP (Four fingers, no thumb, tilted)
+  if (!thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const palmTilted = Math.abs(indexTip.x - pinkyTip.x) > 0.1;
+    if (palmTilted) {
+      return "SLEEP";
     }
+  }
+
+  // 21. THANK YOU (All extended, thumb spread away)
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    const thumbAwayFromPalm = getDistance(thumbTip, indexMCP) > 0.18;
+    if (thumbAwayFromPalm) {
+      return "THANK YOU";
+    }
+  }
+
+  // 22. HELLO (All five fingers extended)
+  if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
+    return "HELLO";
   }
 
   return null;

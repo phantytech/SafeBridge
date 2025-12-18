@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { HeartHandshake, Shield, Video, Users, ArrowRight, Activity, Globe } from 'lucide-react';
+import { HeartHandshake, Shield, Video, Users, ArrowRight, Activity, Globe, BookOpen, Languages } from 'lucide-react';
 import { Link } from 'wouter';
 
 const LandingPage: React.FC = () => {
@@ -170,6 +170,64 @@ const LandingPage: React.FC = () => {
                 A user interface designed for everyone, with high contrast modes and clear visual feedback.
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Learn Sign Language Section */}
+      <div className="py-20 bg-slate-50 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-slate-900 mb-4">Learn Sign Language</h2>
+            <p className="text-slate-500 text-lg">Master hand gestures for communication. Choose your language guide to get started.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <Link href="/sign-language-guide">
+              <motion.div 
+                whileHover={{ y: -5 }}
+                className="p-8 rounded-3xl bg-white border border-slate-100 shadow-lg hover:shadow-xl transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <BookOpen size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">English Signs</h3>
+                    <p className="text-sm text-slate-500">23 essential gestures</p>
+                  </div>
+                </div>
+                <p className="text-slate-500 leading-relaxed mb-4">
+                  Learn universal sign language gestures including HELLO, SOS, HELP, and more basic communication signs.
+                </p>
+                <span className="inline-flex items-center gap-2 text-blue-600 font-bold text-sm group-hover:gap-3 transition-all">
+                  Start Learning <ArrowRight size={16} />
+                </span>
+              </motion.div>
+            </Link>
+            
+            <Link href="/bangla-sign-guide">
+              <motion.div 
+                whileHover={{ y: -5 }}
+                className="p-8 rounded-3xl bg-white border border-slate-100 shadow-lg hover:shadow-xl transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-green-600 group-hover:bg-green-500 group-hover:text-white transition-all">
+                    <Languages size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">বাংলা ইশারা</h3>
+                    <p className="text-sm text-slate-500">36 characters + 10 digits</p>
+                  </div>
+                </div>
+                <p className="text-slate-500 leading-relaxed mb-4">
+                  Learn Bangla Sign Language (BDSL) with the CDD Standard. Master Bengali vowels, consonants, and numerals.
+                </p>
+                <span className="inline-flex items-center gap-2 text-green-600 font-bold text-sm group-hover:gap-3 transition-all">
+                  শিখতে শুরু করুন <ArrowRight size={16} />
+                </span>
+              </motion.div>
+            </Link>
           </div>
         </div>
       </div>

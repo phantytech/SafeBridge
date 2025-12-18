@@ -7,16 +7,23 @@ const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState<'user' | 'parent' | 'police'>('user');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [error, setError] = useState('');
   
-  const { login, signup } = useAuth();
+  const { login, signup, isLoading } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLogin) {
-      login(email, role);
-    } else {
-      signup(name, email, role);
+    setError('');
+    try {
+      if (isLogin) {
+        await login(email, password, role);
+      } else {
+        await signup(name, email, password, role);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
@@ -64,6 +71,12 @@ const AuthPage: React.FC = () => {
             </button>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
@@ -75,6 +88,7 @@ const AuthPage: React.FC = () => {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   placeholder="Enter your name"
+                  disabled={isLoading}
                 />
               </div>
             )}
@@ -88,22 +102,41 @@ const AuthPage: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 placeholder="name@example.com"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Password</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                placeholder="Enter your password"
+                disabled={isLoading}
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 mt-6"
+              disabled={isLoading}
+              className="w-full bg-primary hover:bg-blue-600 disabled:bg-slate-300 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 mt-6"
             >
-              {isLogin ? 'Sign In' : 'Create Account'}
+              {isLoading ? 'Loading...' : (isLogin ? 'Sign In' : 'Create Account')}
               <ArrowRight size={18} />
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-slate-500 hover:text-primary font-medium"
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError('');
+              }}
+              disabled={isLoading}
+              className="text-sm text-slate-500 hover:text-primary font-medium disabled:text-slate-300"
             >
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>
