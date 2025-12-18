@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { profiles, activities } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import type { InsertProfile, InsertActivity, Profile, Activity } from "@shared/schema";
+import { profiles, activities, emergencyAlerts } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
+import type { InsertProfile, InsertActivity, Profile, Activity, EmergencyAlert, InsertEmergencyAlert } from "@shared/schema";
 
 export interface IStorage {
   createProfile(profile: InsertProfile & { id?: string }): Promise<Profile>;
@@ -10,6 +10,9 @@ export interface IStorage {
   updateProfile(id: string, profile: Partial<InsertProfile>): Promise<Profile | undefined>;
   createActivity(activity: InsertActivity & { role: "user" | "parent" | "police" }): Promise<Activity>;
   getActivitiesByUserId(userId: string): Promise<Activity[]>;
+  createEmergencyAlert(alert: InsertEmergencyAlert): Promise<EmergencyAlert>;
+  getEmergencyAlerts(limit?: number): Promise<EmergencyAlert[]>;
+  resolveEmergencyAlert(id: string): Promise<EmergencyAlert | undefined>;
 }
 
 class DbStorage implements IStorage {
@@ -45,6 +48,29 @@ class DbStorage implements IStorage {
   async getActivitiesByUserId(userId: string): Promise<Activity[]> {
     const result = await db.select().from(activities).where(eq(activities.userId, userId));
     return result;
+  }
+
+  async createEmergencyAlert(alert: InsertEmergencyAlert): Promise<EmergencyAlert> {
+    const result = await db.insert(emergencyAlerts).values(alert as any).returning();
+    return result[0];
+  }
+
+  async getEmergencyAlerts(limit: number = 50): Promise<EmergencyAlert[]> {
+    const result = await db
+      .select()
+      .from(emergencyAlerts)
+      .orderBy(desc(emergencyAlerts.createdAt))
+      .limit(limit);
+    return result;
+  }
+
+  async resolveEmergencyAlert(id: string): Promise<EmergencyAlert | undefined> {
+    const result = await db
+      .update(emergencyAlerts)
+      .set({ status: "resolved", resolvedAt: new Date() })
+      .where(eq(emergencyAlerts.id, id))
+      .returning();
+    return result[0];
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProfileSchema, insertActivitySchema, settingsSchema } from "@shared/schema";
+import { insertProfileSchema, insertActivitySchema, settingsSchema, insertEmergencyAlertSchema } from "@shared/schema";
 import { z } from "zod";
 import { supabase } from "./supabase";
 
@@ -229,6 +229,63 @@ export async function registerRoutes(
       res.json(profile);
     } catch (error) {
       res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  // Emergency Alert Routes
+  app.post("/api/emergency/alert", async (req, res) => {
+    try {
+      const { userId, userName, userPhone, latitude, longitude, address } = req.body;
+      
+      if (!userId || !userName) {
+        return res.status(400).json({ error: "Missing required fields: userId, userName" });
+      }
+
+      // Create emergency alert
+      const alert = await storage.createEmergencyAlert({
+        userId,
+        userName,
+        userPhone,
+        latitude: latitude ? parseFloat(latitude) : undefined,
+        longitude: longitude ? parseFloat(longitude) : undefined,
+        address,
+        status: "active"
+      } as any);
+
+      // Log activity
+      await storage.createActivity({
+        userId,
+        role: "user",
+        activityType: "emergency_alert",
+        description: `Emergency SOS triggered${latitude && longitude ? ` at ${address}` : ''}`
+      });
+
+      res.json(alert);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.get("/api/emergency/alerts", async (req, res) => {
+    try {
+      const alerts = await storage.getEmergencyAlerts();
+      res.json(alerts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.patch("/api/emergency/alert/:alertId/resolve", async (req, res) => {
+    try {
+      const alert = await storage.resolveEmergencyAlert(req.params.alertId);
+      
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      
+      res.json(alert);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
     }
   });
 
