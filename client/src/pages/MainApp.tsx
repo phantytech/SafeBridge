@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { useAuth } from '../context/AuthContext';
 import { EmergencyProvider, useEmergency } from '../context/EmergencyContext';
 import { useAccessibility } from '../context/AccessibilityContext';
@@ -17,7 +18,7 @@ import SettingsPage from './Settings';
 import { 
   Bell, User, 
   LayoutDashboard, Video, Settings, LogOut,
-  Accessibility, Users
+  Accessibility, Users, Hand
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
@@ -100,12 +101,39 @@ const DashboardContent = ({ onNavigateToSettings }: { onNavigateToSettings: () =
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-      <div className="lg:col-span-2 flex flex-col gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="lg:col-span-3 flex flex-col gap-6">
         <SignDetector />
+        
+        {/* Sign Language Navigation Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <Link 
+            href="/sign-language-guide"
+            className="flex items-center justify-center gap-3 p-6 bg-white rounded-2xl border border-slate-100 hover:border-primary hover:shadow-md transition-all hover-elevate"
+            data-testid="button-asl-guide"
+          >
+            <Hand size={24} className="text-primary" />
+            <div className="text-left">
+              <p className="font-bold text-slate-800">ASL Guide</p>
+              <p className="text-xs text-slate-500">American Sign Language</p>
+            </div>
+          </Link>
+          
+          <Link 
+            href="/bangla-sign-guide"
+            className="flex items-center justify-center gap-3 p-6 bg-white rounded-2xl border border-slate-100 hover:border-primary hover:shadow-md transition-all hover-elevate"
+            data-testid="button-bdsl-guide"
+          >
+            <Hand size={24} className="text-primary" />
+            <div className="text-left">
+              <p className="font-bold text-slate-800">BdSL Guide</p>
+              <p className="text-xs text-slate-500">Bangla Sign Language</p>
+            </div>
+          </Link>
+        </div>
       </div>
       
-      <div className="lg:col-span-4 flex flex-col gap-6">
+      <div className="lg:col-span-1 flex flex-col gap-6">
         <EmergencyProfileCard onNavigateToSettings={onNavigateToSettings} />
         <div className="flex-1">
           <TextToSign />
