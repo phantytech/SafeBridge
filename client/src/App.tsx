@@ -3,6 +3,7 @@ import LandingPage from './pages/LandingPage';
 import LearnMore from './pages/LearnMore';
 import AuthPage from './pages/AuthPage';
 import MainApp from './pages/MainApp';
+import MeetPage from './pages/MeetPage';
 import SignLanguageGuide from './pages/SignLanguageGuide';
 import BanglaSignGuide from './pages/BanglaSignGuide';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -37,6 +38,11 @@ function App() {
               {/* Protected Routes */}
               <Route path="/dashboard">
                 <ProtectedRoute component={MainApp} />
+              </Route>
+              
+              {/* Meet Route */}
+              <Route path="/meet/:meetCode">
+                {({ meetCode }) => <ProtectedRoute component={() => <MeetPage meetCode={meetCode} />} />}
               </Route>
               
               {/* Fallback */}

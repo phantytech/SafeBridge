@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Share2, Captions } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Share2, Captions, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'wouter';
 import { apiRequest } from '../lib/queryClient';
 import { motion } from 'framer-motion';
 import type { Meeting } from '@shared/schema';
@@ -18,6 +19,32 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
   const [copied, setCopied] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const { user } = useAuth();
+  const [, navigate] = useLocation();
+
+  // Load existing meet if meetCode provided
+  useEffect(() => {
+    if (initialMeetCode && !meeting) {
+      loadMeet(initialMeetCode);
+    }
+  }, [initialMeetCode]);
+
+  const loadMeet = async (code: string) => {
+    try {
+      const res = await apiRequest('GET', `/api/meets/${code}`);
+      const data = await res.json();
+      if (data.error) {
+        console.error('Meet not found');
+        return;
+      }
+      setMeeting(data);
+      // Auto-join if not the creator
+      if (user && data.createdByUserId !== user.id) {
+        await joinMeet(code);
+      }
+    } catch (error) {
+      console.error('Failed to load meet:', error);
+    }
+  };
 
   const createMeet = async () => {
     if (!user) return;
@@ -29,20 +56,28 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       const data = await res.json();
       setMeetCode(data.meetCode);
       setMeeting(data);
+      // Navigate to meet URL
+      navigate(`/meet/${data.meetCode}`);
     } catch (error) {
       console.error('Failed to create meet:', error);
     }
   };
 
-  const joinMeet = async () => {
-    if (!user || !meetCode) return;
+  const joinMeet = async (code?: string) => {
+    if (!user || !meetCode && !code) return;
+    const codeToUse = code || meetCode;
     try {
-      const res = await apiRequest('POST', `/api/meets/${meetCode}/join`, {
+      const res = await apiRequest('POST', `/api/meets/${codeToUse}/join`, {
         userId: user.id,
         userName: user.name
       });
       const data = await res.json();
       setMeeting(data);
+      setMeetCode(codeToUse);
+      // Navigate to meet URL if not already there
+      if (!initialMeetCode) {
+        navigate(`/meet/${codeToUse}`);
+      }
     } catch (error) {
       console.error('Failed to join meet:', error);
     }
@@ -54,6 +89,7 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       await apiRequest('PATCH', `/api/meets/${meeting.id}/end`);
       setMeetCode(null);
       setMeeting(null);
+      navigate('/dashboard');
     } catch (error) {
       console.error('Failed to end meet:', error);
     }
@@ -145,8 +181,15 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       {/* Controls Bar */}
       <div className="h-20 bg-slate-800 border-t border-slate-700 flex items-center justify-between px-8">
         <div className="flex items-center gap-4 text-white">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            title="Back to dashboard"
+          >
+            <ArrowLeft size={18} className="text-slate-300" />
+          </button>
           <span className="font-bold">SafeMeet</span>
-          <span className="text-slate-400 text-sm">Code: {meetCode.toUpperCase()}</span>
+          <span className="text-slate-400 text-sm">Code: {meetCode?.toUpperCase()}</span>
           <button
             onClick={copyToClipboard}
             className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
