@@ -18,6 +18,8 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [copied, setCopied] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isFull, setIsFull] = useState(false);
   const { user } = useAuth();
   const [, navigate] = useLocation();
 
@@ -33,15 +35,21 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
       const res = await apiRequest('GET', `/api/meets/${code}`);
       const data = await res.json();
       if (data.error) {
+        setError('Meet not found');
         console.error('Meet not found');
         return;
       }
       setMeeting(data);
+      // Check if already at capacity
+      if (data.participants && data.participants.length >= 1) {
+        setIsFull(true);
+      }
       // Auto-join if not the creator
       if (user && data.createdByUserId !== user.id) {
         await joinMeet(code);
       }
     } catch (error) {
+      setError('Failed to load meet');
       console.error('Failed to load meet:', error);
     }
   };
@@ -71,14 +79,27 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
         userId: user.id,
         userName: user.name
       });
+      if (!res.ok) {
+        const data = await res.json();
+        if (res.status === 409) {
+          setIsFull(true);
+          setError('This meeting is full. Only 1 participant can join per meeting.');
+          return;
+        }
+        setError(data.error || 'Failed to join meet');
+        return;
+      }
       const data = await res.json();
       setMeeting(data);
       setMeetCode(codeToUse);
+      setError(null);
+      setIsFull(data.participants && data.participants.length >= 1);
       // Navigate to meet URL if not already there
       if (!initialMeetCode) {
         navigate(`/meet/${codeToUse}`);
       }
     } catch (error) {
+      setError('Failed to join meet');
       console.error('Failed to join meet:', error);
     }
   };
@@ -111,6 +132,12 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
           <h2 className="text-3xl font-display font-bold text-white mb-4">Start SafeMeet</h2>
           <p className="text-slate-300 mb-8 max-w-md">Create a new meeting or join one with a code</p>
           
+          {error && (
+            <div className="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg text-red-200 text-sm">
+              {error}
+            </div>
+          )}
+          
           <div className="space-y-4">
             <button
               onClick={createMeet}
@@ -130,11 +157,12 @@ const SafeMeet: React.FC<SafeMeetProps> = ({ meetCode: initialMeetCode }) => {
                 data-testid="input-meet-code"
               />
               <button
-                onClick={joinMeet}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                onClick={() => joinMeet()}
+                disabled={isFull}
+                className={`${isFull ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white font-bold py-2 px-4 rounded-lg transition-colors`}
                 data-testid="button-join-meet"
               >
-                Join
+                {isFull ? 'Full' : 'Join'}
               </button>
             </div>
           </div>

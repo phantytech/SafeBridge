@@ -341,7 +341,11 @@ export async function registerRoutes(
       const updated = await storage.addMeetingParticipant(meeting.id, userId, userName);
       res.json(updated);
     } catch (error) {
-      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("Meeting is full")) {
+        return res.status(409).json({ error: message });
+      }
+      res.status(400).json({ error: message });
     }
   });
 

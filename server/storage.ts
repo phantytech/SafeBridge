@@ -92,6 +92,17 @@ class DbStorage implements IStorage {
     if (!meeting[0]) return undefined;
 
     const currentParticipants = meeting[0].participants || [];
+    
+    // Check if user already in meeting
+    if (currentParticipants.some(p => p.userId === userId)) {
+      return meeting[0];
+    }
+    
+    // Check capacity: max 1 participant (creator + 1 = 2 total)
+    if (currentParticipants.length >= 1) {
+      throw new Error("Meeting is full. Only 1 participant can join per meeting.");
+    }
+    
     const newParticipant = { userId, name: userName, joinedAt: new Date().toISOString() };
     
     const result = await db
