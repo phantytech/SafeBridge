@@ -289,5 +289,75 @@ export async function registerRoutes(
     }
   });
 
+  // Meeting Routes (SafeMeet)
+  app.post("/api/meets", async (req, res) => {
+    try {
+      const { createdByUserId, createdByName } = req.body;
+      
+      if (!createdByUserId || !createdByName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Generate unique meet code (6-7 character alphanumeric like Google Meet)
+      const meetCode = Math.random().toString(36).substring(2, 9).toLowerCase();
+      
+      const meeting = await storage.createMeeting({
+        meetCode,
+        createdByUserId,
+        createdByName,
+        status: "active",
+        participants: []
+      } as any);
+
+      res.json(meeting);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.get("/api/meets/:meetCode", async (req, res) => {
+    try {
+      const meeting = await storage.getMeetingByCode(req.params.meetCode);
+      
+      if (!meeting) {
+        return res.status(404).json({ error: "Meet not found" });
+      }
+      
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
+  app.post("/api/meets/:meetCode/join", async (req, res) => {
+    try {
+      const { userId, userName } = req.body;
+      const meeting = await storage.getMeetingByCode(req.params.meetCode);
+      
+      if (!meeting) {
+        return res.status(404).json({ error: "Meet not found" });
+      }
+
+      const updated = await storage.addMeetingParticipant(meeting.id, userId, userName);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof z.ZodError ? error.errors : error });
+    }
+  });
+
+  app.patch("/api/meets/:meetId/end", async (req, res) => {
+    try {
+      const meeting = await storage.endMeeting(req.params.meetId);
+      
+      if (!meeting) {
+        return res.status(404).json({ error: "Meet not found" });
+      }
+      
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Server error" });
+    }
+  });
+
   return httpServer;
 }

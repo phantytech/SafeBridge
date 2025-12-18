@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { profiles, activities, emergencyAlerts } from "@shared/schema";
+import { profiles, activities, emergencyAlerts, meetings } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
-import type { InsertProfile, InsertActivity, Profile, Activity, EmergencyAlert, InsertEmergencyAlert } from "@shared/schema";
+import type { InsertProfile, InsertActivity, Profile, Activity, EmergencyAlert, InsertEmergencyAlert, Meeting, InsertMeeting } from "@shared/schema";
 
 export interface IStorage {
   createProfile(profile: InsertProfile & { id?: string }): Promise<Profile>;
@@ -13,6 +13,10 @@ export interface IStorage {
   createEmergencyAlert(alert: InsertEmergencyAlert): Promise<EmergencyAlert>;
   getEmergencyAlerts(limit?: number): Promise<EmergencyAlert[]>;
   resolveEmergencyAlert(id: string): Promise<EmergencyAlert | undefined>;
+  createMeeting(meeting: InsertMeeting): Promise<Meeting>;
+  getMeetingByCode(meetCode: string): Promise<Meeting | undefined>;
+  addMeetingParticipant(meetId: string, userId: string, userName: string): Promise<Meeting | undefined>;
+  endMeeting(meetId: string): Promise<Meeting | undefined>;
 }
 
 class DbStorage implements IStorage {
@@ -69,6 +73,40 @@ class DbStorage implements IStorage {
       .update(emergencyAlerts)
       .set({ status: "resolved", resolvedAt: new Date() })
       .where(eq(emergencyAlerts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createMeeting(meeting: InsertMeeting): Promise<Meeting> {
+    const result = await db.insert(meetings).values(meeting as any).returning();
+    return result[0];
+  }
+
+  async getMeetingByCode(meetCode: string): Promise<Meeting | undefined> {
+    const result = await db.select().from(meetings).where(eq(meetings.meetCode, meetCode));
+    return result[0];
+  }
+
+  async addMeetingParticipant(meetId: string, userId: string, userName: string): Promise<Meeting | undefined> {
+    const meeting = await db.select().from(meetings).where(eq(meetings.id, meetId));
+    if (!meeting[0]) return undefined;
+
+    const currentParticipants = meeting[0].participants || [];
+    const newParticipant = { userId, name: userName, joinedAt: new Date().toISOString() };
+    
+    const result = await db
+      .update(meetings)
+      .set({ participants: [...currentParticipants, newParticipant] as any })
+      .where(eq(meetings.id, meetId))
+      .returning();
+    return result[0];
+  }
+
+  async endMeeting(meetId: string): Promise<Meeting | undefined> {
+    const result = await db
+      .update(meetings)
+      .set({ status: "ended", endedAt: new Date() })
+      .where(eq(meetings.id, meetId))
       .returning();
     return result[0];
   }

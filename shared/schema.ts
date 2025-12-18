@@ -42,6 +42,17 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").default(sql`now()`).notNull(),
 });
 
+export const meetings = pgTable("meetings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  meetCode: varchar("meet_code").notNull().unique(),
+  createdByUserId: varchar("created_by_user_id").notNull().references(() => profiles.id),
+  createdByName: text("created_by_name").notNull(),
+  status: text("status").notNull().$type<"active" | "ended">().default("active"),
+  participants: jsonb("participants").$type<Array<{ userId: string; name: string; joinedAt: string }>>().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").default(sql`now()`).notNull(),
+  endedAt: timestamp("ended_at"),
+});
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({
   id: true,
   createdAt: true,
@@ -73,6 +84,12 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   createdAt: true,
 });
 
+export const insertMeetingSchema = createInsertSchema(meetings).omit({
+  id: true,
+  createdAt: true,
+  endedAt: true,
+});
+
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
 export type Profile = typeof profiles.$inferSelect;
 export type Settings = z.infer<typeof settingsSchema>;
@@ -80,3 +97,5 @@ export type EmergencyAlert = typeof emergencyAlerts.$inferSelect;
 export type InsertEmergencyAlert = z.infer<typeof insertEmergencyAlertSchema>;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;
+export type Meeting = typeof meetings.$inferSelect;
+export type InsertMeeting = z.infer<typeof insertMeetingSchema>;
